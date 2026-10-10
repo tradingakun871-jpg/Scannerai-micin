@@ -170,6 +170,7 @@ async function worker(){
         console.log("[security-phase1]",token.network,token.symbol,
           "alchemy",evidence.alchemy?.status||"N/A",
           "holders",evidence.holders?.status||"UNVERIFIED",
+          "holderSamples",evidence.holders?.accountsInspected??evidence.holders?.sampledCount??0,
           "lp",evidence.liquidityLock?.status||"UNVERIFIED",
           "decision",decision.status);
         if(decision.eligible)await sendBuyAlert({token,decision});
