@@ -18,15 +18,25 @@ const parseResult=(input)=>{
   return {summary:s.slice(0,1200),positives:[],risks:[],technical_view:"Tidak tersedia"};
 };
 export function providerStatus() {
-  const requested=(process.env.AI_PROVIDER||"anthropic").toLowerCase();
-  const isClaude=!!process.env.ANTHROPIC_API_KEY;
-  const isRouter=!!(process.env.AI_BASE_URL && process.env.AI_API_KEY);
-  const provider=requested==="router"?"router":"anthropic";
-  return {provider,configured:provider==="router"?isRouter:isClaude,model:provider==="router"?(process.env.AI_MODEL||"AISCANER"):(process.env.ANTHROPIC_MODEL||"claude-sonnet-4-5"),alternativeAvailable:provider==="router"?isClaude:isRouter};
+  const selected=(process.env.AI_PROVIDER||"openai").toLowerCase();
+  const provider=["openai","anthropic","router"].includes(selected)?selected:"openai";
+  const keys={
+    openai:!!process.env.OPENAI_API_KEY,
+    anthropic:!!process.env.ANTHROPIC_API_KEY,
+    router:!!(process.env.AI_BASE_URL&&process.env.AI_API_KEY)
+  };
+  const models={
+    openai:process.env.OPENAI_MODEL||"gpt-5-mini",
+    anthropic:process.env.ANTHROPIC_MODEL||"claude-sonnet-4-5",
+    router:process.env.AI_MODEL||"AISCANER"
+  };
+  return {provider,configured:keys[provider],model:models[provider],
+    alternativeAvailable:Object.entries(keys).some(([id,available])=>id!==provider&&available)};
 }
+
 export async function analyzeToken(token,inspection=null){
   const p=providerStatus();
-  if(!p.configured) throw new Error("AI belum dikonfigurasi. Tambahkan Anthropic API Key atau 9Router API di Railway.");
+  if(!p.configured) throw new Error("AI belum dikonfigurasi. Tambahkan API key untuk AI_PROVIDER yang dipilih di Railway.");
   const info = {
     token:token.symbol,network:token.network,contract:token.tokenAddress,
     price:token.price,liquidity_usd:token.liquidity,volume_24h:token.volume24h,
@@ -41,7 +51,38 @@ export async function analyzeToken(token,inspection=null){
     }
   };
   let content;
-  if(p.provider==="anthropic"){
+  if(p.provider==="openai"){
+    const response=await withTimeout("https://api.openai.com/v1/responses",{
+      method:"POST",
+      headers:{"content-type":"application/json","authorization":"Bearer "+process.env.OPENAI_API_KEY},
+      body:JSON.stringify({
+        model:p.model,
+        store:false,
+        max_output_tokens:1600,
+        reasoning:{effort:"low"},
+        instructions:SYSTEM,
+        input:JSON.stringify(info),
+        text:{format:{type:"json_schema",name:"meme_coin_research",strict:true,
+          schema:{type:"object",additionalProperties:false,
+            properties:{
+              summary:{type:"string"},
+              positives:{type:"array",items:{type:"string"}},
+              risks:{type:"array",items:{type:"string"}},
+              technical_view:{type:"string"},
+              suggested_action:{type:"string",enum:["WAIT"]}
+            },
+            required:["summary","positives","risks","technical_view","suggested_action"]
+          }
+        }}
+      })
+    },45000);
+    if(response.status!=="completed")throw new Error("OpenAI response incomplete or failed");
+    const blocks=(response.output||[]).filter(x=>x.type==="message")
+      .flatMap(x=>x.content||[]);
+    if(blocks.some(x=>x.type==="refusal"))throw new Error("OpenAI declined the research request");
+    content=blocks.filter(x=>x.type==="output_text").map(x=>x.text||"").join("\n");
+    if(!content.trim())throw new Error("OpenAI response contained no text");
+  } else if(p.provider==="anthropic"){
     const response=await withTimeout("https://api.anthropic.com/v1/messages",{
       method:"POST",
       headers:{"content-type":"application/json","x-api-key":process.env.ANTHROPIC_API_KEY,"anthropic-version":"2023-06-01"},
