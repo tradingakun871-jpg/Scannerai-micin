@@ -9,6 +9,7 @@ import {inspectToken,cachedInspection,inspectionStats} from "./intelligence.js";
 import {technicalAnalysis,cachedTechnical} from "./technical.js";
 import {calibratedFor,modelSummary,cachedCalibration} from "./model.js";
 import {decideSignal} from "./signal.js";
+import {summarizePipeline} from "./pipeline.js";
 import {computeOpportunity} from "./scoring.js";
 import {sendBuyAlert,telegramReady} from "./telegram.js";
 
@@ -25,6 +26,7 @@ app.use((req,res,next)=>{
 const PORT=Number(process.env.PORT)||3000;
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../public");
 const has=(key)=>!!process.env[key];
+const aiActivity={lastSuccessAt:null,lastErrorAt:null};
 const sources=()=>({
   market:{geckoterminal:{configured:true,implemented:true},dexscreener:{configured:true,implemented:true}},
   solana:{helius:{configured:has("HELIUS_API_KEY"),implemented:true,limited:true,verified:false}},
@@ -125,9 +127,19 @@ app.get("/api/overview",async(req,res)=>{
   if(mode==="early")tokens=tokens.filter(t=>t.discovery==="New Pools"||t.discovery==="DEX Profiles"||["ACCUMULATION","NEW POOL","EARLY BREAKOUT"].includes(t.phase));
   if(mode==="trending")tokens=tokens.filter(t=>t.discovery==="Trending 24H");
   if(search)tokens=tokens.filter(t=>[t.symbol,t.name,t.tokenAddress].some(x=>String(x||"").toLowerCase().includes(search)));
+  // UI pipeline is calculated from actual cached token inspections, not hardcoded HTML.
+  const pipeline=summarizePipeline({
+    tokens:s.tokens.filter(t=>t.liquidity>=100000).map(t=>({
+      id:t.id,symbol:t.symbol,network:t.network,liquidity:t.liquidity,
+      inspection:cachedInspection(t.id)
+    })),
+    focusId:String(req.query.focus||"").slice(0,220),
+    sourceStatus:s.sourceStatus,provider:providerStatus(),
+    aiSuccessAt:aiActivity.lastSuccessAt,aiErrorAt:aiActivity.lastErrorAt
+  });
   res.json({app:"MICIN RADAR",version:"2.0",lastScan:s.scannedAt,started:s.scanStartedAt,
     sourceStatus:s.sourceStatus,loading:s.loading,durationMs:s.lastScanDurationMs,
-    metrics:s.metrics,errors:s.errors,filters:{network,mode,search},
+    metrics:s.metrics,errors:s.errors,pipeline,filters:{network,mode,search},
     tokens:tokens.slice(0,120).map(visibleToken),totalFiltered:tokens.length,networkOptions:NETWORKS,
     integrations:sources(),policy:{liquidityMinimum:100000,largePoolThreshold:1000000,maxHolderPct:2.5,
       autoTrade:false,blueprint:"LOCKED"},disclaimer:"BUY cannot be issued until all on-chain, social, technical and statistical checks are independently verified."});
@@ -181,8 +193,9 @@ app.post("/api/ai/analyze",safeAdmin,async(req,res)=>{
     const inspection=cachedInspection(key);
     const analysis=await analyzeToken(token,inspection);
     await saveReview(token,analysis);
+    aiActivity.lastSuccessAt=new Date().toISOString();
     res.json({token:{id:token.id,symbol:token.symbol,network:token.network},analysis});
-  }catch(e){recentCalls.delete(key);res.status(503).json({error:String(e.message||"AI belum tersedia").slice(0,200)})}
+  }catch(e){aiActivity.lastErrorAt=new Date().toISOString();recentCalls.delete(key);res.status(503).json({error:String(e.message||"AI belum tersedia").slice(0,200)})}
 });
 app.use(express.static(root,{maxAge:"10m",index:false}));
 app.get("*",(req,res)=>res.sendFile(path.join(root,"index.html")));
@@ -234,8 +247,9 @@ async function worker(){
         const analysis=await analyzeToken(token,cachedInspection(token.id));
         await saveReview(token,analysis);
         aiReviewsToday++;
+        aiActivity.lastSuccessAt=new Date().toISOString();
         console.log("[AI review]",token.id,analysis.model,"WAIT");
-      }catch(err){console.warn("[AI review]",String(err.message).slice(0,130))}
+      }catch(err){aiActivity.lastErrorAt=new Date().toISOString();console.warn("[AI review]",String(err.message).slice(0,130))}
     }
     cycles++;
   }catch(e){console.error("[worker]",String(e.message).slice(0,200))}
