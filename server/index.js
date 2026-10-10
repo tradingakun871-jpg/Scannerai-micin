@@ -5,7 +5,8 @@ import {SCAN_INTERVAL_MS,NETWORKS,scanMarkets,scanStatus} from "./scanner.js";
 import {persistScan,getHistory,saveReview,saveInspection,dbInfo} from "./store.js";
 import {analyzeToken,providerStatus} from "./ai.js";
 import {inspectToken,cachedInspection,inspectionStats} from "./intelligence.js";
-import {technicalAnalysis} from "./technical.js";
+import {technicalAnalysis,cachedTechnical} from "./technical.js";
+import {calibratedFor,modelSummary,cachedCalibration} from "./model.js";
 import {decideSignal} from "./signal.js";
 import {computeOpportunity} from "./scoring.js";
 import {sendBuyAlert,telegramReady} from "./telegram.js";
@@ -47,7 +48,7 @@ function tokenById(id){return scanStatus().tokens.find(t=>t.id===id)}
 function visibleToken(token){
   const evidence=cachedInspection(token.id);
   const score=computeOpportunity(token,evidence);
-  const decision=decideSignal(token,evidence,null,score.opportunityScore);
+  const decision=decideSignal(token,evidence,cachedTechnical(token.id),score.opportunityScore,cachedCalibration(token));
   return {...token,
     security:evidence?.security?.status||"UNVERIFIED",
     holderMaxPct:evidence?.holders?.topObservedPct??null,
@@ -85,6 +86,7 @@ app.get("/api/overview",async(req,res)=>{
 });
 app.get("/api/integrations",(req,res)=>res.json({integrations:sources(),autoTrading:false,blueprint:"V2.0 LOCKED"}));
 app.get("/api/history",async(req,res)=>res.json(await getHistory()));
+app.get("/api/model-status",async(req,res)=>res.json(await modelSummary()));
 app.get("/api/inspection",(req,res)=>{
   const id=String(req.query.tokenId||"").slice(0,220);
   const token=tokenById(id);
@@ -92,7 +94,7 @@ app.get("/api/inspection",(req,res)=>{
   const inspection=cachedInspection(id);
   const score=computeOpportunity(token,inspection);
   return res.json({opportunity:score,token:{id:token.id,symbol:token.symbol,network:token.network},
-    inspection,decision:decideSignal(token,inspection,null,score.opportunityScore),
+    inspection,decision:decideSignal(token,inspection,cachedTechnical(token.id),score.opportunityScore,cachedCalibration(token)),
     verified:false,note:"Data missing is treated as UNVERIFIED; partial on-chain evidence is not a full risk audit."});
 });
 app.post("/api/inspect",safeAdmin,async(req,res)=>{
@@ -103,10 +105,11 @@ app.post("/api/inspect",safeAdmin,async(req,res)=>{
     const includeTechnical=req.body?.withTechnical===true;
     const technical=includeTechnical?await technicalAnalysis(token):null;
     const score=computeOpportunity(token,inspection);
-    const decision=decideSignal(token,inspection,technical,score.opportunityScore);
+    const calibration=await calibratedFor(token);
+    const decision=decideSignal(token,inspection,technical||cachedTechnical(token.id),score.opportunityScore,calibration);
     await saveInspection(token,inspection,decision);
     await sendBuyAlert({token,decision});
-    res.json({token:{id:token.id,symbol:token.symbol},inspection,technical,opportunity:score,decision});
+    res.json({token:{id:token.id,symbol:token.symbol},inspection,technical,opportunity:score,calibration,decision});
   }catch(e){console.error("[inspect]",e.message);res.status(502).json({error:"Pemeriksaan provider tidak selesai: "+String(e.message).slice(0,130)})}
 });
 app.post("/api/scan",safeAdmin,async(req,res)=>{
@@ -153,7 +156,9 @@ async function worker(){
       try{
         const evidence=await inspectToken(token);
         const score=computeOpportunity(token,evidence);
-        const decision=decideSignal(token,evidence,null,score.opportunityScore);
+        const technical=token===eligible[0]?await technicalAnalysis(token):cachedTechnical(token.id);
+        const calibration=token===eligible[0]?await calibratedFor(token):cachedCalibration(token);
+        const decision=decideSignal(token,evidence,technical,score.opportunityScore,calibration);
         await saveInspection(token,evidence,decision);
         if(decision.eligible)await sendBuyAlert({token,decision});
       }catch(e){console.warn("[inspection]",token.id,String(e.message).slice(0,100))}
