@@ -125,24 +125,47 @@ function openToken(id){
  const t=state.overview?.tokens.find(x=>x.id===id);
  if(!t)return;state.selected=t;
  const rows=[["Liquidity Amount",t.liquidity>=100000?"MARKET PASS":"REJECT"],["LP Lock Status",t.liquidityLock||"UNVERIFIED"],["Holder ≤ 2.5%",t.holderMaxPct!=null?String(t.holderMaxPct.toFixed(2))+"% OBSERVED":"UNVERIFIED"],["Contract",t.security||"UNVERIFIED"],["Bundler / Wallet Cluster","UNVERIFIED"],["Sniper Analysis","UNVERIFIED"],["Smart Money","UNVERIFIED"],["Social Sentiment","INSUFFICIENT DATA"]];
- const safeUrl=String(t.url||"").startsWith("https://www.geckoterminal.com/")?t.url:"#";
+ const safeUrl=/^https:\/\/(www\.)?(geckoterminal\.com|dexscreener\.com)\//.test(String(t.url||""))?t.url:"#";
  $("drawerContent").innerHTML=`<h2>${esc(t.symbol)} <span style="color:var(--green);font-size:12px">${esc(chainLabel(t.network))}</span></h2><div class="drawer-sub">${esc(t.tokenAddress)}</div><div class="drawer-grid"><div class="drawer-stat"><span>PRICE USD</span><b>${money(t.price)}</b></div><div class="drawer-stat"><span>LIQUIDITY</span><b>${compact(t.liquidity)}</b></div><div class="drawer-stat"><span>VOLUME 24H</span><b>${compact(t.volume24h)}</b></div><div class="drawer-stat"><span>PRICE CHANGE</span><b>${percent(t.change24h)}</b></div><div class="drawer-stat"><span>MARKET PHASE (rule-based)</span><b style="font-size:14px">${esc(t.phase)}</b></div><div class="drawer-stat"><span>ACTIVITY SCORE</span><b>${t.momentum}/100</b></div></div><h3>Security Validation — Blueprint V2.0</h3>${rows.map(([name,status])=>`<div class="checklist-item"><span>${esc(name)}</span><b>${esc(status)}</b></div>`).join("")}<div class="drawer-warning">⚠️ <b>WAIT — NOT VERIFIED.</b> Activity Score adalah metrik pasar sederhana, bukan AI Opportunity Score, Winrate, atau probabilitas TP. Tidak ada rekomendasi BUY sebelum seluruh pemeriksaan keamanan lolos.</div><div class="drawer-actions"><a class="btn btn-outline" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ GeckoTerminal</a><button class="btn btn-outline" id="inspectBtn">⬡ Periksa Security</button><button class="btn btn-outline" id="technicalBtn">▥ OHLCV MTF</button><button class="btn btn-primary" id="aiAnalyzeBtn">◇ Analisis AI</button></div><div id="inspectionEvidence" class="drawer-note">Memuat data on-chain terakhir...</div><div id="aiAnalysisResult" class="drawer-note">Analisis AI aktif setelah OPENAI_API_KEY dan DASHBOARD_ADMIN_KEY tersedia di Railway. AI hanya memberikan riset; sinyal tetap WAIT sampai validasi selesai.</div>`;
  $("tokenDrawer").classList.add("open");$("drawerOverlay").classList.add("open");$("tokenDrawer").setAttribute("aria-hidden","false");loadInspectionCache();
 }
-async function loadInspectionCache(){
+async async function loadInspectionCache(){
  const t=state.selected;if(!t)return;
  try{
- const out=await api("/api/inspection?tokenId="+encodeURIComponent(t.id));
- if(state.selected?.id!==t.id)return;
- if(!out.inspection)return;
- const x=out.inspection;
- const rows=[["GoPlus",x.security],["Honeypot",x.honeypot],["LP Lock",x.liquidityLock],
- ["Holder",x.holders],["Bundler",x.bundler],["Sniper",x.sniper],
- ["Wallet Cluster",x.walletClustering],["Smart Money",x.smartMoney],["Social",x.social]];
- const markup=rows.map(([label,detail])=>'<div class="checklist-item"><span>'+esc(label)+
- ' <small style="display:block;color:#7e919d">'+esc(detail?.reason||"Belum dianalisis")+'</small></span><b>'+esc(detail?.status||"UNVERIFIED")+'</b></div>').join("");
- $("inspectionEvidence").innerHTML="<h3>Latest On-Chain Evidence</h3>"+markup+
- "<p class='hint'>Last inspect: "+esc(fmtWib(x.inspectedAt))+" · status "+esc(out.decision?.status||"WAIT")+"</p>";
+   const out=await api("/api/inspection?tokenId="+encodeURIComponent(t.id));
+   if(state.selected?.id!==t.id)return;
+   const panel=$("inspectionEvidence");if(!panel)return;
+   if(!out.inspection){
+     panel.innerHTML="<h3>On-Chain Security Intelligence</h3><p>Token belum masuk jadwal pemeriksaan atau hasil belum tersimpan. Gunakan tombol Periksa Security untuk pemindaian baru.</p>";
+     return;
+   }
+   const x=out.inspection;
+   const rows=[["GoPlus Contract",x.security],["Honeypot",x.honeypot],
+      ["Exact LP Lock / Burn",x.liquidityLock],["Holder ≤ 2.5%",x.holders],
+      ["Bundler",x.bundler],["Sniper",x.sniper],
+      ["Wallet Clustering",x.walletClustering],["Smart Money",x.smartMoney],
+      ["Social Sentiment",x.social]];
+   const result=rows.map(([label,detail])=>{
+      const status=detail?.status||"UNVERIFIED";
+      const pct=detail?.topObservedPct!=null?" · sampled top "+Number(detail.topObservedPct).toFixed(2)+"%":"";
+      const flag=detail?.sharedFundingCandidates?.length?" · shared funding candidates: "+detail.sharedFundingCandidates.length:"";
+      const source=detail?.source?"Source: "+detail.source+" · ":"";
+      return '<div class="checklist-item"><span><b>'+esc(label)+'</b>'+
+        '<small style="display:block;color:#8da1ad;white-space:normal;margin-top:4px">'+
+        esc(source+(detail?.reason||"Not inspected")+pct+flag)+'</small></span>'+
+        '<b>'+esc(status)+'</b></div>';
+   }).join("");
+   const coverage=(x.sourceCoverage||[]).map(item=>
+     '<span class="integrate-pill" style="margin:4px">'+esc(item.kind)+': '+(item.success?"RESPONDED":"NOT VERIFIED")+'</span>').join("");
+   const alchemy=x.alchemy?('<p class="hint">Alchemy: '+esc(x.alchemy.status)+
+     ' · recent transfers '+esc(x.alchemy.transferCount||0)+
+     ' · wallets sampled '+esc(x.alchemy.sampledHolderCount||0)+
+     ' · '+esc(x.alchemy.reason||"Recent chain evidence")+'</p>'):"";
+   panel.innerHTML='<h3>Security Evidence — Blockchain Data</h3>'+
+     '<p class="hint">Last inspect: '+esc(fmtWib(x.inspectedAt))+
+     ' · Decision: '+esc(out.decision?.status||"WAIT")+'</p>'+
+     alchemy+result+'<h3>Data Source Coverage</h3>'+coverage+
+     '<p class="hint">PARTIAL / UNVERIFIED bukan PASS. Sampel transaksi tidak membuktikan identitas pengendali wallet; bukti LP V2 tidak berlaku otomatis untuk V3 atau CLMM.</p>';
  }catch(e){toast("Gagal memuat bukti: "+e.message,true)}
 }
 async function runInspection(kind){
