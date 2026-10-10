@@ -5,7 +5,7 @@ export function decideSignal(token,inspection,technical,aiScore=null,modelCalibr
   const reasons=[];
   const checks={
     liquidityAmount:token.liquidity>=100000,
-    liquidityLock:false,
+    liquidityLock:pass(inspection?.liquidityLock),
     holder:pass(inspection?.holders),
     contract:pass(inspection?.security)&&pass(inspection?.honeypot),
     bundler:pass(inspection?.bundler),
