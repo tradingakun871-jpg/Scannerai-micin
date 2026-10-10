@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#0b1018"/>
+  <meta name="description" content="MICIN RADAR V2.0 - real-time meme coin discovery, security intelligence and conservative AI analysis."/>
+  <title>MICIN RADAR | Early Gem Intelligence V2.0</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/styles.css"/>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-icon">M<span>↗</span></div><div><div class="brand-title">MICIN<span>RADAR</span></div><small>EARLY GEM INTELLIGENCE</small></div></div>
+    <div class="side-label">WORKSPACE</div>
+    <nav id="navigation" aria-label="Navigasi">
+      <button class="nav-item active" data-view="radar"><span class="nav-symbol">◈</span> Overview <span class="nav-suffix">↗</span></button>
+      <button class="nav-item" data-view="discovery"><span class="nav-symbol">◎</span> Gem Discovery</button>
+      <button class="nav-item" data-view="signals"><span class="nav-symbol">⌁</span> BUY Signals <span class="nav-counter" id="signalNavCount">0</span></button>
+      <button class="nav-item" data-view="security"><span class="nav-symbol">⬡</span> Security Center</button>
+      <button class="nav-item" data-view="learning"><span class="nav-symbol">▥</span> AI Learning</button>
+    </nav>
+    <div class="side-label side-label-second">MANAGEMENT</div>
+    <nav>
+      <button class="nav-item" data-view="integrations"><span class="nav-symbol">◫</span> API Integrations</button>
+      <button class="nav-item" data-view="settings"><span class="nav-symbol">⚙</span> Configuration</button>
+    </nav>
+    <div class="side-footer"><div class="side-footer-top"><span class="pulse"></span> BLUEPRINT V2.0 <span class="lock">LOCKED</span></div><div class="side-footer-text">Automated trading disabled.<br/>Research & signal monitoring only.</div><a href="https://github.com/tradingakun871-jpg/Scannerai-micin" target="_blank" rel="noreferrer" class="github-link">↗ View GitHub repository</a></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><button class="mobile-menu" id="mobileMenu" aria-label="Buka menu">☰</button><div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumb">Overview</strong></div><div class="top-actions"><span class="network-state" id="connectionState"><span class="pulse"></span> Connecting</span><span class="top-time" id="clock">--:-- WIB</span><button class="circle-btn" title="Segarkan data" id="topRefresh">⟳</button><div class="avatar">AI</div></div></header>
+    <div class="content">
+      <div class="page-header"><div><div class="eyebrow"><span class="green-dot"></span> AI MEME COIN EARLY GEM HUNTER <span class="slash">/</span> V2.0</div><h1 id="pageTitle">Market Intelligence <span>Dashboard</span></h1><p id="pageSubtitle">Pantau peluang awal dari 4 blockchain dengan data on-chain. Sinyal BUY hanya setelah validasi lengkap.</p></div><div class="page-actions"><button class="btn btn-outline" id="exportButton">⇩ Export CSV</button><button class="btn btn-primary" id="refreshButton"><span>↻</span> Refresh Market</button></div></div>
+      <div class="notice" id="globalNotice"><span class="notice-icon">ⓘ</span><div><b>LIVE DISCOVERY — STRICT VALIDATION</b><p>Market data aktif bila provider merespons. Status holder, liquidity lock, bundler, sniper, dan sentimen tidak diasumsikan aman sebelum API terverifikasi.</p></div><button class="notice-close" id="noticeClose">×</button></div>
+
+      <section class="view active" id="view-radar">
+        <div class="metric-grid" id="metricGrid">
+          <div class="metric-card"><div class="metric-label">Pool Diamati <span>◈</span></div><div class="metric-number" id="metricObserved">—</div><div class="metric-foot">Trending + New Pools</div></div>
+          <div class="metric-card"><div class="metric-label">Liquidity Candidates <span>◎</span></div><div class="metric-number" id="metricCandidates">—</div><div class="metric-foot">≥ $100K liquidity</div></div>
+          <div class="metric-card"><div class="metric-label">BUY Tervalidasi <span>⌁</span></div><div class="metric-number green" id="metricBuys">0</div><div class="metric-foot">Strict security gate</div></div>
+          <div class="metric-card"><div class="metric-label">Blockchain <span>⬡</span></div><div class="metric-number" id="metricChains">4</div><div class="metric-foot">SOL · ETH · BSC · BASE</div></div>
+        </div>
+        <div class="insights-grid">
+          <div class="panel panel-chart"><div class="panel-head"><div><div class="overline">MARKET ACTIVITY</div><h3>Top Liquidity Pools <span class="muted">(USD)</span></h3></div><span class="tiny-tag">LIVE SNAPSHOT</span></div><div id="liquidityChart" class="liq-chart"><div class="empty-mini">Menunggu data market...</div></div></div>
+          <div class="panel guard-panel"><div class="panel-head"><div><div class="overline">BUY ELIGIBILITY</div><h3>Validation Pipeline</h3></div><span class="tiny-tag amber">FAIL CLOSED</span></div><div class="gate-line"><div class="gate-dot ok">1</div><div><b>Market Discovery</b><small>GeckoTerminal / DEX</small></div><span id="gateMarket" class="gate-state">Pending</span></div><div class="gate-line"><div class="gate-dot">2</div><div><b>Liquidity & LP Lock</b><small>Required by Blueprint V2.0</small></div><span class="gate-state warn">Unverified</span></div><div class="gate-line"><div class="gate-dot">3</div><div><b>Holder ≤ 2.5%</b><small>Helius / EVM Indexer</small></div><span class="gate-state warn">Unverified</span></div><div class="gate-line"><div class="gate-dot">4</div><div><b>Bundler & Sniper</b><small>Wallet cluster inspection</small></div><span class="gate-state warn">Unverified</span></div><div class="gate-line"><div class="gate-dot">5</div><div><b>Social + AI Decision</b><small>Claude / 9Router after checks</small></div><span class="gate-state warn">Awaiting</span></div></div>
+        </div>
+        <div class="panel table-panel"><div class="panel-head radar-head"><div><div class="overline">DISCOVERY ENGINE</div><h3>Live Meme Coin Radar <span class="count-chip" id="tableCount">0</span></h3></div><div class="data-time" id="lastScanText">Belum ada pemindaian</div></div><div class="filters"><div class="search-box">⌕ <input id="searchInput" placeholder="Cari nama, ticker atau contract..." autocomplete="off"/></div><select id="chainSelect" aria-label="Pilih blockchain"><option value="all">All Networks</option><option value="solana">Solana</option><option value="eth">Ethereum</option><option value="bsc">BNB Chain</option><option value="base">Base</option></select><select id="modeSelect" aria-label="Mode scanner"><option value="all">All Discoveries</option><option value="early">Early Discovery</option><option value="trending">Trending 24H</option></select><span class="filter-caption">MIN LP $100K</span></div><div class="table-scroll"><table class="token-table"><thead><tr><th>COIN / NETWORK</th><th>LIQUIDITY</th><th>VOL 24H</th><th>24H CHANGE</th><th>BUY / SELL</th><th>MARKET PHASE</th><th>ACTIVITY</th><th>AI SIGNAL</th><th></th></tr></thead><tbody id="tokenRows"><tr><td colspan="9" class="table-empty">Mengambil pool terbaru...</td></tr></tbody></table></div><div class="table-bottom"><span id="tableFoot">Data sumber publik. Tidak ada sinyal BUY otomatis.</span><span>Auto scan <strong>05:00</strong> min <span class="green-dot"></span></span></div></div>
+      </section>
+
+      <section class="view" id="view-discovery">
+        <div class="section-banner"><div><div class="overline">EARLY GEM ENGINE</div><h2>Temukan momentum <em>sebelum viral</em></h2><p>Deteksi pool baru, akumulasi, lonjakan pembeli, dan breakout awal. Kandidat tetap WAIT sebelum seluruh keamanan terverifikasi.</p></div><div class="banner-symbol">↗</div></div>
+        <div class="mini-grid"><div class="mini-card"><b>01 / NEW POOLS</b><p>Pool baru dari Solana, Ethereum, BNB dan Base.</p></div><div class="mini-card"><b>02 / EARLY PHASE</b><p>Perkiraan fase berbasis transaksi dan harga.</p></div><div class="mini-card"><b>03 / RISK GATES</b><p>Security, LP, holder, sniper, bundler wajib lolos.</p></div></div>
+        <div class="panel table-panel"><div class="panel-head"><div><div class="overline">EARLY DETECTED</div><h3>Pool Awal & Akumulasi</h3></div><span class="tiny-tag">LIVE DATA</span></div><div class="table-scroll"><table class="token-table"><thead><tr><th>COIN</th><th>NETWORK</th><th>LIQUIDITY</th><th>VOL 24H</th><th>MARKET PHASE</th><th>STATUS</th></tr></thead><tbody id="earlyRows"><tr><td colspan="6" class="table-empty">Menunggu scanner...</td></tr></tbody></table></div></div>
+      </section>
+
+      <section class="view" id="view-signals"><div class="section-banner"><div><div class="overline">TRADE INTELLIGENCE</div><h2>BUY Signal <em>Command Center</em></h2><p>Entry, SL dan target profit dalam kelipatan X yang direkomendasikan AI setelah pemeriksaan wajib selesai.</p></div><div class="banner-symbol">⌁</div></div><div class="metric-grid two"><div class="metric-card"><div class="metric-label">ACTIVE BUY SIGNALS</div><div class="metric-number green">0</div><div class="metric-foot">Belum ada sinyal terverifikasi</div></div><div class="metric-card"><div class="metric-label">TP PROBABILITY ENGINE</div><div class="metric-number" style="font-size:24px">AWAITING DATA</div><div class="metric-foot">Historical + forward calibration needed</div></div></div><div class="panel empty-state"><div class="empty-icon">⌁</div><h3>Belum ada BUY Signal yang memenuhi syarat</h3><p>Scanner tidak menerbitkan BUY sampai holder, liquidity lock, security, bundler, sniper, sosial, dan AI terbukti memenuhi Blueprint V2.0.</p><button class="btn btn-outline goto-radar">Buka Market Radar →</button></div></section>
+
+      <section class="view" id="view-security"><div class="section-banner"><div><div class="overline">RISK INTELLIGENCE</div><h2>Security & Wallet <em>Defense</em></h2><p>Deteksi honeypot, izin kontrak, penguasaan supply, bundler, sniper dan risiko penarikan LP.</p></div><div class="banner-symbol">⬡</div></div><div class="security-grid">
+        <div class="panel security-card"><div class="security-symbol">◇</div><h3>Liquidity Lock</h3><p>$100K–$1M wajib UNLOCKED (HIGH RISK), di atas $1M wajib LOCKED/BURNED. Semua status harus dibuktikan on-chain.</p><span class="integrate-pill">INTEGRATION PENDING</span></div>
+        <div class="panel security-card"><div class="security-symbol">◎</div><h3>Holder Distribution</h3><p>Maksimum 2,5% per wallet non-sistem maupun cluster dengan kendali yang terbukti sama.</p><span class="integrate-pill">INTEGRATION PENDING</span></div>
+        <div class="panel security-card"><div class="security-symbol">◈</div><h3>Bundler Detection</h3><p>Analisis transaksi launch, shared funding, keterkaitan developer, dan kepemilikan terkoordinasi.</p><span class="integrate-pill">INTEGRATION PENDING</span></div>
+        <div class="panel security-card"><div class="security-symbol">⌁</div><h3>Sniper Detection</h3><p>Pembelian cepat saat launch, konsentrasi sniper, saldo tersisa, dan potensi distribusi.</p><span class="integrate-pill">INTEGRATION PENDING</span></div>
+        <div class="panel security-card"><div class="security-symbol">⊘</div><h3>Honeypot & Contract</h3><p>Mint/freeze authority, pembatasan jual, fee dan kontrak mencurigakan.</p><span class="integrate-pill">INTEGRATION PENDING</span></div>
+        <div class="panel security-card"><div class="security-symbol">▧</div><h3>Social Intelligence</h3><p>StockGeist, Telegram dan Reddit; data yang belum tersedia tidak dihitung positif.</p><span class="integrate-pill">INTEGRATION PENDING</span></div>
+      </div></section>
+
+      <section class="view" id="view-learning"><div class="section-banner"><div><div class="overline">MODEL EVALUATION</div><h2>AI Learning <em>& Journal</em></h2><p>Evaluasi 1H, 6H, 12H, 24H, 7D, 30D. Sinyal yang gagal tidak dihapus dari pembelajaran.</p></div><div class="banner-symbol">▥</div></div><div class="metric-grid two"><div class="metric-card"><div class="metric-label">SCAN SNAPSHOTS</div><div class="metric-number" id="snapshotCount">—</div><div class="metric-foot">PostgreSQL persistent history</div></div><div class="metric-card"><div class="metric-label">AI REVIEW RECORDS</div><div class="metric-number" id="aiReviewCount">—</div><div class="metric-foot">Claude / 9Router evaluation log</div></div></div><div class="panel"><div class="panel-head"><div><div class="overline">SCANNER JOURNAL</div><h3>Scan Activity Timeline</h3></div><span class="tiny-tag">DATABASE</span></div><div id="historyChart" class="history-area"><div class="empty-mini">Hubungkan PostgreSQL untuk menyimpan histori scanner.</div></div></div><div class="panel history-panel"><div class="panel-head"><h3>AI Review Journal</h3></div><div id="reviewList" class="reviews-placeholder">Belum ada evaluasi AI yang tercatat.</div></div></section>
+
+      <section class="view" id="view-integrations"><div class="section-banner"><div><div class="overline">DATA & MODEL SOURCES</div><h2>API Integrations <em>Monitor</em></h2><p>Masukkan API key melalui Railway Variables. Dashboard tidak menampilkan atau menyimpan kredensial rahasia.</p></div><div class="banner-symbol">◫</div></div><div class="integration-grid" id="integrationGrid"></div><div class="panel api-note"><h3>Menambahkan API Key</h3><p>Buka Railway → service website → Variables. Tambahkan nama variable dari kartu integrasi, lalu deploy ulang. API market publik berfungsi tanpa key. Hanya status konfigurasi yang ditampilkan di sini; integrasi data lanjutan tetap harus diaktifkan dan diuji.</p><div class="code-ex">ANTHROPIC_API_KEY=••••••••••<br/>ANTHROPIC_MODEL=claude-sonnet-4-5<br/>DATABASE_URL=postgres://...<br/>DASHBOARD_ADMIN_KEY=••••••••••</div></div></section>
+
+      <section class="view" id="view-settings"><div class="section-banner"><div><div class="overline">SYSTEM POLICY</div><h2>Configuration <em>& Guardrails</em></h2><p>Blueprint V2.0 dikunci. Semua kontrol perdagangan otomatis dinonaktifkan.</p></div><div class="banner-symbol">⚙</div></div><div class="settings-grid"><div class="panel config-card"><div class="panel-head"><h3>Blueprint Rules</h3><span class="tiny-tag">LOCKED</span></div><div class="config-item"><span>Scanner interval</span><b>Every 5 minutes</b></div><div class="config-item"><span>Small pool</span><b>$100K–$1M, UNLOCKED</b></div><div class="config-item"><span>Large pool</span><b>Above $1M, LOCKED</b></div><div class="config-item"><span>Max holder</span><b>2.5%</b></div><div class="config-item"><span>Bundler / Sniper</span><b>Mandatory verification</b></div><div class="config-item"><span>Automatic trading</span><b class="red">DISABLED</b></div></div><div class="panel config-card"><div class="panel-head"><h3>Administrator Access</h3></div><p class="hint">Untuk tombol analisis Claude dan manual scan, tetapkan <code>DASHBOARD_ADMIN_KEY</code> di Railway lalu masukkan nilai yang sama di bawah. Kunci hanya disimpan selama tab terbuka.</p><label class="input-label" for="adminKeyInput">Admin API Key</label><input type="password" id="adminKeyInput" placeholder="Masukkan key yang dibuat di Railway"/><div class="row-buttons"><button class="btn btn-primary" id="saveAdminKey">Gunakan key</button><button class="btn btn-outline" id="clearAdminKey">Hapus dari sesi</button></div><div class="mini-status" id="adminKeyState">Belum ada key dalam sesi browser.</div></div></div></section>
+      <footer class="footer"><span>© MICIN RADAR · V2.0 BLUEPRINT LOCKED</span><span>Research only · No automatic buying · All times WIB</span></footer>
+    </div>
+  </main>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<aside class="drawer" id="tokenDrawer" aria-label="Detail token" aria-hidden="true"><div class="drawer-top"><span class="overline">TOKEN INTELLIGENCE</span><button id="drawerClose" aria-label="Tutup">×</button></div><div id="drawerContent"></div></aside>
+</body>
+</html>
