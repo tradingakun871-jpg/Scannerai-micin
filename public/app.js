@@ -75,9 +75,9 @@ function renderIntegrations(){
  const rows=[
   ["GeckoTerminal","Trending + New Pools","PUBLIC API",{configured:true,implemented:true}],
   ["DEX Screener","Latest profiles + token pool market","PUBLIC API",i.market.dexscreener],
-  ["Helius","Solana full holder indexing","HELIUS_API_KEY",i.solana.helius],
+  ["Helius","Solana paginated token account sampling; exclusions pending","HELIUS_API_KEY",i.solana.helius],
   ["Routescan","EVM top holders & transfer evidence (limited coverage)","ROUTESCAN_API_KEY",i.evm.routescan],
-  ["Alchemy","EVM RPC / wallet trace indexing","ALCHEMY_API_KEY",i.evm.alchemy],
+  ["Alchemy","EVM recent ERC20 evidence / exact V2 LP burn; not full index","ALCHEMY_API_KEY",i.evm.alchemy],
   ["GoPlus Security","Contract and LP holder risk data","GOPLUS_ACCESS_TOKEN",i.security.goplus],
   ["Honeypot.is","EVM simulated buy/sell","PUBLIC API",i.security.honeypot],
   ["StockGeist","Social sentiment","STOCKGEIST_API_KEY",i.social.stockgeist],
