@@ -26,11 +26,11 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../public"
 const has=(key)=>!!process.env[key];
 const sources=()=>({
   market:{geckoterminal:{configured:true,implemented:true},dexscreener:{configured:true,implemented:true}},
-  solana:{helius:{configured:has("HELIUS_API_KEY"),implemented:false}},
+  solana:{helius:{configured:has("HELIUS_API_KEY"),implemented:true,limited:true,verified:false}},
   evm:{routescan:{configured:has("ROUTESCAN_API_KEY"),implemented:true,limited:true},
-    alchemy:{configured:has("ALCHEMY_API_KEY"),implemented:false}},
+    alchemy:{configured:has("ALCHEMY_API_KEY"),implemented:true,limited:true,verified:false}},
   security:{goplus:{configured:has("GOPLUS_ACCESS_TOKEN"),publicFallback:true,implemented:true},
-    honeypot:{configured:true,implemented:true,chainLimited:true},lpProof:{implemented:false}},
+    honeypot:{configured:true,implemented:true,chainLimited:true},lpProof:{configured:has("ALCHEMY_API_KEY"),implemented:true,scope:"EVM exact V2 burn only; V3/CLMM and lock services unverified"}},
   social:{stockgeist:{configured:has("STOCKGEIST_API_KEY"),implemented:false},
     telegram:{configured:has("TELEGRAM_BOT_TOKEN"),implemented:false},
     reddit:{configured:false,implemented:false}},
@@ -151,7 +151,14 @@ async function worker(){
     const stored=await persistScan(state);
     console.log("[scanner]",state.sourceStatus,"observed",state.tokens.length,"errors",state.errors.length,"DB",stored);
     // Bounded inspection of candidates, preserving public-tier rates.
-    const eligible=state.tokens.filter(t=>t.liquidity>=100000&&t.price>0).slice(0,2);
+    const candidates=state.tokens.filter(t=>t.liquidity>=100000&&t.price>0);
+    const networks=["solana","eth","bsc","base"];
+    // Rotate chains and candidates; bound costly calls to two per 5-minute scan.
+    const eligible=networks.slice(cycles%4).concat(networks.slice(0,cycles%4))
+      .map((network,i)=>{
+        const group=candidates.filter(t=>t.network===network);
+        return group.length?group[Math.floor(cycles/4+i)%group.length]:null;
+      }).filter(Boolean).slice(0,2);
     for(const token of eligible){
       try{
         const evidence=await inspectToken(token);
@@ -160,6 +167,11 @@ async function worker(){
         const calibration=token===eligible[0]?await calibratedFor(token):cachedCalibration(token);
         const decision=decideSignal(token,evidence,technical,score.opportunityScore,calibration);
         await saveInspection(token,evidence,decision);
+        console.log("[security-phase1]",token.network,token.symbol,
+          "alchemy",evidence.alchemy?.status||"N/A",
+          "holders",evidence.holders?.status||"UNVERIFIED",
+          "lp",evidence.liquidityLock?.status||"UNVERIFIED",
+          "decision",decision.status);
         if(decision.eligible)await sendBuyAlert({token,decision});
       }catch(e){console.warn("[inspection]",token.id,String(e.message).slice(0,100))}
     }
