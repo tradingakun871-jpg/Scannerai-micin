@@ -1,4 +1,5 @@
 import express from "express";
+import {adminKeyMatches,makeSession,verifySession,readSessionCookie,isSameOrigin,COOKIE_NAME,COOKIE_LIFETIME_MS,cookieOptions} from "./admin-session.js";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
 import {SCAN_INTERVAL_MS,NETWORKS,scanMarkets,scanStatus} from "./scanner.js";
@@ -37,10 +38,57 @@ const sources=()=>({
   notifications:{telegram:{configured:telegramReady(),implemented:true}},
   ai:providerStatus(),database:dbInfo(),inspector:inspectionStats()
 });
+// Browser login stores a signed, HttpOnly cookie, never the Railway key in localStorage.
+const loginFailures=new Map();
+const maxFailures=10,failWindowMs=15*60*1000;
+function adminSession(req){
+  return verifySession(readSessionCookie(req.get("Cookie")),process.env.DASHBOARD_ADMIN_KEY);
+}
+function failureState(ip,now=Date.now()){
+  const previous=loginFailures.get(ip);
+  if(!previous||now-previous.start>failWindowMs){
+    const fresh={start:now,count:0};
+    loginFailures.set(ip,fresh);
+    if(loginFailures.size>2500){
+      for(const [k,v] of loginFailures){if(now-v.start>failWindowMs)loginFailures.delete(k)}
+    }
+    return fresh;
+  }
+  return previous;
+}
+app.get("/api/admin/session",(req,res)=>{
+  const session=adminSession(req);
+  if(session?.refresh)res.cookie(COOKIE_NAME,makeSession(process.env.DASHBOARD_ADMIN_KEY),cookieOptions);
+  res.json({authenticated:!!session,expiresAt:session?.refresh?new Date(Date.now()+COOKIE_LIFETIME_MS).toISOString():
+    session?new Date(session.expiresAt).toISOString():null,persistenceDays:90});
+});
+app.post("/api/admin/login",(req,res)=>{
+  if(!isSameOrigin(req))return res.status(403).json({error:"Login harus dari website yang sama menggunakan HTTPS."});
+  const expected=process.env.DASHBOARD_ADMIN_KEY;
+  if(!expected)return res.status(503).json({error:"DASHBOARD_ADMIN_KEY belum dikonfigurasi di Railway."});
+  const ip=req.ip||"unknown",state=failureState(ip);
+  if(state.count>=maxFailures)return res.status(429).json({error:"Terlalu banyak percobaan. Coba lagi dalam 15 menit."});
+  if(!adminKeyMatches(req.body?.key,expected)){
+    state.count++;return res.status(401).json({error:"Admin key salah."});
+  }
+  loginFailures.delete(ip);
+  res.cookie(COOKIE_NAME,makeSession(expected),cookieOptions);
+  return res.json({authenticated:true,persistenceDays:90,storage:"secure_httponly_cookie"});
+});
+app.post("/api/admin/logout",(req,res)=>{
+  if(!isSameOrigin(req))return res.status(403).json({error:"Origin tidak valid."});
+  res.clearCookie(COOKIE_NAME,{httpOnly:true,secure:true,sameSite:"strict",path:"/"});
+  res.json({authenticated:false});
+});
 const safeAdmin=(req,res,next)=>{
   const expected=process.env.DASHBOARD_ADMIN_KEY;
   if(!expected)return res.status(503).json({error:"DASHBOARD_ADMIN_KEY belum diatur di Railway."});
-  if(req.get("X-Admin-Key")!==expected)return res.status(401).json({error:"Admin key tidak valid."});
+  const header=req.get("X-Admin-Key");
+  if(header&&adminKeyMatches(header,expected))return next();
+  const session=adminSession(req);
+  if(!session)return res.status(401).json({error:"Login administrator diperlukan. Buka Configuration."});
+  if(!isSameOrigin(req))return res.status(403).json({error:"Origin administrator tidak valid."});
+  if(session.refresh)res.cookie(COOKIE_NAME,makeSession(expected),cookieOptions);
   next();
 };
 const recentCalls=new Map();
