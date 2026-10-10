@@ -19,6 +19,8 @@ async function init(){
       first_price NUMERIC NOT NULL CHECK(first_price>0),last_seen TIMESTAMPTZ NOT NULL,
       last_price NUMERIC NOT NULL,max_price NUMERIC NOT NULL,min_price NUMERIC NOT NULL,
       last_liquidity NUMERIC,source TEXT,latest_phase TEXT)`);
+    await pool.query("ALTER TABLE token_discoveries ADD COLUMN IF NOT EXISTS first_phase TEXT");
+    await pool.query("ALTER TABLE token_discoveries ADD COLUMN IF NOT EXISTS first_liquidity NUMERIC");
     await pool.query(`CREATE TABLE IF NOT EXISTS token_observations(
       id BIGSERIAL PRIMARY KEY,observed_at TIMESTAMPTZ NOT NULL,token_id TEXT NOT NULL,
       price NUMERIC NOT NULL,liquidity NUMERIC NOT NULL,volume24h NUMERIC NOT NULL,
@@ -57,8 +59,8 @@ export async function persistScan(state){
       await client.query(`WITH incoming AS (
           SELECT * FROM jsonb_to_recordset($1::jsonb)
           AS r(token_id TEXT,symbol TEXT,network TEXT,price NUMERIC,liquidity NUMERIC,volume24h NUMERIC,phase TEXT,source TEXT)
-        ) INSERT INTO token_discoveries(token_id,network,symbol,first_seen,first_price,last_seen,last_price,max_price,min_price,last_liquidity,source,latest_phase)
-        SELECT token_id,network,symbol,$2::timestamptz,price,$2::timestamptz,price,price,price,liquidity,source,phase FROM incoming
+        ) INSERT INTO token_discoveries(token_id,network,symbol,first_seen,first_price,last_seen,last_price,max_price,min_price,last_liquidity,source,latest_phase,first_phase,first_liquidity)
+        SELECT token_id,network,symbol,$2::timestamptz,price,$2::timestamptz,price,price,price,liquidity,source,phase,phase,liquidity FROM incoming
         ON CONFLICT(token_id) DO UPDATE SET last_seen=EXCLUDED.last_seen,last_price=EXCLUDED.last_price,
           max_price=GREATEST(token_discoveries.max_price,EXCLUDED.last_price),
           min_price=LEAST(token_discoveries.min_price,EXCLUDED.last_price),
@@ -121,4 +123,24 @@ export async function getHistory(){
         calibrated:false,notice:"Observational history only. Forward holdout and price-executable validation not established."}};
   }catch(e){dbError=e.message;return {configured:true,rows:[],reviews:[],summary:null,error:"Database temporarily unavailable"}}
 }
+export async function getCalibrationCohorts(){
+  if(!pool)return {rows:[],coverage:0,total:0,error:"No database"};
+  try{
+    await init();
+    // Explicitly include matured-but-disappeared tokens in coverage accounting.
+    const query=await pool.query(`SELECT d.first_seen,d.first_phase,d.first_liquidity,
+      d.first_price::float AS first_price,m.max_price::float AS max_price,
+      m.observed_at
+      FROM token_discoveries d
+      LEFT JOIN token_milestones m ON m.token_id=d.token_id
+        AND m.horizon='30D' AND m.observed_at <= d.first_seen+INTERVAL '32 days'
+      WHERE d.first_seen <= NOW()-INTERVAL '30 days'
+      ORDER BY d.first_seen DESC LIMIT 15000`);
+    const rows=query.rows;
+    const full=rows.filter(x=>x.observed_at);
+    return {rows:full,coverage:rows.length?full.length/rows.length:0,total:rows.length,
+      missing:rows.length-full.length};
+  }catch(e){return {rows:[],coverage:0,total:0,error:String(e.message).slice(0,150)}}
+}
+
 export function dbInfo(){return {configured:!!pool,error:dbError}}
