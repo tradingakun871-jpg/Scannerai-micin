@@ -24,7 +24,7 @@ export function providerStatus() {
   const provider=requested==="router"?"router":"anthropic";
   return {provider,configured:provider==="router"?isRouter:isClaude,model:provider==="router"?(process.env.AI_MODEL||"AISCANER"):(process.env.ANTHROPIC_MODEL||"claude-sonnet-4-5"),alternativeAvailable:provider==="router"?isClaude:isRouter};
 }
-export async function analyzeToken(token){
+export async function analyzeToken(token,inspection=null){
   const p=providerStatus();
   if(!p.configured) throw new Error("AI belum dikonfigurasi. Tambahkan Anthropic API Key atau 9Router API di Railway.");
   const info = {
@@ -33,9 +33,11 @@ export async function analyzeToken(token){
     price_change_24h_pct:token.change24h,buys_24h:token.buys,sells_24h:token.sells,
     detected_market_phase:token.phase,
     mandatory_checks:{
-      lp_lock:"NOT VERIFIED",holder_max_2_5_pct:"NOT VERIFIED",
-      bundler:"NOT VERIFIED",sniper:"NOT VERIFIED",social:"NOT VERIFIED",
-      contract_safety:"NOT VERIFIED"
+      lp_lock:inspection?.liquidityLock||"NOT VERIFIED",holder_max_2_5_pct:inspection?.holders||"NOT VERIFIED",
+      bundler:inspection?.bundler||"NOT VERIFIED",sniper:inspection?.sniper||"NOT VERIFIED",
+      social:inspection?.social||"NOT VERIFIED",
+      contract_safety:inspection?.security||"NOT VERIFIED",honeypot:inspection?.honeypot||"NOT VERIFIED",
+      smart_money:inspection?.smartMoney||"NOT VERIFIED"
     }
   };
   let content;
