@@ -119,21 +119,34 @@ export async function inspectToken(t,{force=false}={}){
     });
     const raw=t.network==="solana"?d.goplus?.result?.[t.tokenAddress]:
       d.goplus?.result?.[t.tokenAddress.toLowerCase()]||d.goplus?.result?.[t.tokenAddress];
-    const flow=transferSignals(d.transfers,t);
-    const [solanaCensus,socialEvidence] = await Promise.all([
+    const backupFlow=transferSignals(d.transfers,t);
+    const [solanaCensus,socialEvidence,evm,poolProof] = await Promise.all([
       t.network==="solana"?inspectSolanaHolders(t.tokenAddress):Promise.resolve(null),
-      socialMentions(t)
+      socialMentions(t),
+      chain&&process.env.ALCHEMY_API_KEY?inspectEvm(t):Promise.resolve(null),
+      chain&&process.env.ALCHEMY_API_KEY?inspectExactEvmV2Pool(t):Promise.resolve(null)
     ]);
+    const flow=evm?.status==="OBSERVED"?
+      Object.fromEntries(["walletClustering","bundler","sniper","smartMoney"].map(k=>[k,evm[k]])):backupFlow;
+    const legacyHolder=parseHolders(raw,d.holders);
+    const holder=solanaCensus||(evm?.status==="OBSERVED"?
+      {...evm.holders,goPlusTopObservedPct:legacyHolder.topObservedPct,
+       sampleSource:"Alchemy recent blocks + GoPlus token holders"}:legacyHolder);
+    const lp=poolProof?.status==="PASS"?poolProof:{
+      ...parseLp(raw,t),exactPoolEvidence:poolProof||null,
+      reason:poolProof?.reason||"Exact liquidity pool lock status not verifiable"
+    };
     const out={
       tokenId:key,inspectedAt:new Date().toISOString(),errors,
       security:securityStatus(raw,t.network),
       honeypot:parseHoneypot(d.honeypot),
-      liquidityLock:parseLp(raw,t),
-      holders:solanaCensus||parseHolders(raw,d.holders),
+      liquidityLock:lp,
+      holders:holder,
       ...flow,
+      alchemy:evm?{status:evm.status,reason:evm.reason||null,transferCount:evm.transferCount||0,sampledHolderCount:evm.sampledHolderCount||0,fromBlock:evm.fromBlock||null,toBlock:evm.toBlock||null}:null,
       social:socialEvidence,
       buyStatus:"WAIT", opportunityScore:null, calibratedProbability:null,
-      sourceCoverage:endpoints.map(x=>({kind:x.kind,success:!!d[x.kind]}))
+      sourceCoverage:[...endpoints.map(x=>({kind:x.kind,success:!!d[x.kind]})),{kind:"alchemy",success:evm?.status==="OBSERVED"},{kind:"exact_lp",success:poolProof?.status==="PASS"},{kind:"helius",success:!!solanaCensus?.accountsInspected}]
     };
     if(out.security.status==="CRITICAL"||out.honeypot.status==="CRITICAL"||out.holders.status==="REJECT"){
       out.buyStatus="NO BUY";
