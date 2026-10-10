@@ -14,7 +14,7 @@
 - ApeWisdom Reddit crypto-ticker mention counts; **not contract-authenticated social sentiment**.
 - On-demand GeckoTerminal M5 / M15 / H1 / H4 OHLCV calculations and research-only support/SL scenarios.
 - Opportunity Score with exact blueprint weights, held as unavailable when components are missing.
-- Protected Claude AI / 9Router commentary, with optional one review per scan and max 48 daily if configured.
+- Protected OpenAI / Claude / 9Router commentary, with optional one review per scan and max 48 daily if configured.
 - PostgreSQL full token observations, first detection, 1H / 6H / 12H / 24H / 7D / 30D cohorts, risk and AI journals.
 - Chronological train/forward empirical 30D multiplier calibration with sample-size and coverage gates. **No verified predictions until data maturity.**
 - Telegram sender that refuses to send unverified BUY alerts.
@@ -26,7 +26,7 @@
 3. Bundler/sniper links and developer-funded coordination need full historical traces, not merely same-block transfer samples.
 4. Social evidence needs token-specific verified data; ticker mentions can be spoofed.
 5. Smart money profitability requires verified wallet history.
-6. Actual Claude API key has not been provided.
+6. OpenAI API key is configured in Railway; API availability and billing must be verified.
 7. Statistical TP model needs several hundred **matured 30D** cohorts and independent forward validation; no historical data can be conjured.
 8. No auto trade is implemented (intentional).
 
@@ -36,7 +36,10 @@ Service: `micin-radar-web`, project: `Scannerai-micin`. **Never paste API creden
 ```dotenv
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 DASHBOARD_ADMIN_KEY=your_secret_here
-AI_PROVIDER=anthropic
+AI_PROVIDER=openai
+OPENAI_API_KEY=your_openai_key_here
+OPENAI_MODEL=gpt-5-mini
+# Optional Claude alternative:
 ANTHROPIC_API_KEY=your_anthropic_key_here
 ANTHROPIC_MODEL=claude-sonnet-4-5
 AI_AUTO_REVIEW=true
@@ -69,7 +72,7 @@ Helius holder census is bounded at four pages (4,000 token accounts) by default 
 - `GET /api/inspection?tokenId=...` — cached evidence, no API spending
 - `POST /api/inspect` — protected, fetch on-chain evidence
 - `POST /api/technical` — protected, fetch MTF OHLCV
-- `POST /api/ai/analyze` — protected, call Claude or 9Router
+- `POST /api/ai/analyze` — protected, call OpenAI, Claude or 9Router
 - `POST /api/scan` — protected, trigger scan
 
 Protected calls require `X-Admin-Key` equal to `DASHBOARD_ADMIN_KEY` in Railway.
