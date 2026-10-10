@@ -45,3 +45,5 @@ export async function technicalAnalysis(token){
   cache.set(token.id,{at:Date.now(),data:result});
   return result;
 }
+
+export function cachedTechnical(tokenId){return cache.get(tokenId)?.data||null}
