@@ -1,8 +1,10 @@
+import {inspectEvm,inspectExactEvmV2Pool} from "./evm.js";
 import {inspectSolanaHolders} from "./solana.js";
 import {socialMentions} from "./social.js";
 // Evidence-led enrichment: missing evidence NEVER becomes PASS.
 const CHAIN={eth:1,bsc:56,base:8453};
 const cache=new Map();
+const pending=new Map();
 const TTL=12*60*1000;
 const num=x=>Number.isFinite(Number(x))?Number(x):0;
 const bool=x=>x===true||x===1||x==="1";
@@ -38,11 +40,12 @@ function parseHolders(raw,route){
   const active=candidates.filter(h=>!excluded.includes(h));
   const max=active.length?Math.max(...active.map(x=>x.pct)):null;
   return {
-    status:max!==null&&max>2.5?"REJECT":"UNVERIFIED",
+    status:"UNVERIFIED",
+    largeHolderObserved:max!==null&&max>2.5,
     topObservedPct:max,observedCount:active.length,
     excludedTaggedCount:excluded.length,
-    reason:max!==null&&max>2.5?"Ditemukan holder non-sistem di atas 2,5%":
-      "Sampel top holder tersedia tetapi cakupan lengkap dan cluster satu kendali belum dapat dibuktikan",
+    reason:max!==null&&max>2.5?"Sampel di atas 2,5%; identifikasi LP/sistem wajib sebelum kesimpulan":
+      "Sampel holder dan cluster satu kendali belum lengkap",
     source:route?.items?.length?"GoPlus + Routescan":raw?.holders?.length?"GoPlus":null
   };
 }
@@ -94,7 +97,7 @@ export async function inspectToken(t,{force=false}={}){
   if(!t?.tokenAddress||!t?.network)return null;
   const key=t.id,hit=cache.get(key);
   if(!force&&hit&&Date.now()-hit.at<TTL)return hit.data;
-  if(hit?.running)return hit.running;
+  if(pending.has(key))return pending.get(key);
   const promise=(async()=>{
     const chain=CHAIN[t.network];
     const params=new URLSearchParams({contract_addresses:t.tokenAddress.toLowerCase()});
@@ -136,12 +139,14 @@ export async function inspectToken(t,{force=false}={}){
       out.buyStatus="NO BUY";
     }
     // ALL six critical risk gates must be independently verified. Currently launch cluster, LP position and social aren't.
-    cache.set(key,{at:Date.now(),data:out});
     return out;
   })();
-  cache.set(key,{...(hit||{}),running:promise});
-  try{return await promise}
-  finally{const x=cache.get(key);if(x?.running===promise)cache.delete(key)}
+  pending.set(key,promise);
+  try{
+    const out=await promise;
+    cache.set(key,{at:Date.now(),data:out});
+    return out;
+  }finally{pending.delete(key)}
 }
 export function cachedInspection(id){const c=cache.get(id);return c?.data||null}
 export function inspectionStats(){return {cached:[...cache.values()].filter(x=>x.data).length,ageLimitSeconds:TTL/1000}}
