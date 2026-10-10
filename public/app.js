@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const state={overview:null,view:"radar",selected:null,search:"",network:"all",mode:"all",history:null,notice:true,adminAuthenticated:false};
+const state={overview:null,view:"radar",selected:null,search:"",network:"all",mode:"all",history:null,notice:true,adminAuthenticated:false,pipelineFocus:null};
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const n=x=>Number(x)||0;
 const compact=(x)=>{const v=n(x);if(v>=1e9)return "$"+(v/1e9).toFixed(2)+"B";if(v>=1e6)return "$"+(v/1e6).toFixed(2)+"M";if(v>=1e3)return "$"+(v/1e3).toFixed(v>1e5?0:1)+"K";return "$"+v.toFixed(0)};
@@ -41,15 +41,44 @@ function getVisible(){
  });
 }
 function tokenHtml(t,i,early=false){
- if(early)return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(t.discovery)}</small></div></div></td><td><span class="chain-pill">${esc(chainLabel(t.network))}</span></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td><span class="phase-pill early">${esc(t.phase)}</span></td><td><span class="waiting">WAIT / UNVERIFIED</span></td></tr>`;
+ if(early)return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(t.discovery)}</small></div></div></td><td><span class="chain-pill">${esc(chainLabel(t.network))}</span></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td><span class="phase-pill early">${esc(t.phase)}</span></td><td><span class="waiting">${esc(t.signal||"WAIT")}</span></td></tr>`;
  const phaseClass=["EARLY BREAKOUT","ACCUMULATION","NEW POOL"].includes(t.phase)?"early":t.phase==="DISTRIBUTION"?"risk":"";
- return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(chainLabel(t.network))} · ${esc(t.discovery)}</small></div></div></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td>${percent(t.change24h)}</td><td><span class="percent up">${n(t.buys).toLocaleString("id-ID")}</span> / <span class="percent down">${n(t.sells).toLocaleString("id-ID")}</span></td><td><span class="phase-pill ${phaseClass}">${esc(t.phase)}</span></td><td><span class="activity-wrap"><span class="activity-bar"><i style="width:${Math.max(0,Math.min(100,n(t.momentum)))}%"></i></span><small>${n(t.momentum)}/100</small></span></td><td><span class="waiting">WAIT</span></td><td class="row-arrow">›</td></tr>`;
+ return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(chainLabel(t.network))} · ${esc(t.discovery)}</small></div></div></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td>${percent(t.change24h)}</td><td><span class="percent up">${n(t.buys).toLocaleString("id-ID")}</span> / <span class="percent down">${n(t.sells).toLocaleString("id-ID")}</span></td><td><span class="phase-pill ${phaseClass}">${esc(t.phase)}</span></td><td><span class="activity-wrap"><span class="activity-bar"><i style="width:${Math.max(0,Math.min(100,n(t.momentum)))}%"></i></span><small>${n(t.momentum)}/100</small></span></td><td><span class="waiting">${esc(t.signal||"WAIT")}</span></td><td class="row-arrow">›</td></tr>`;
 }
 function renderChart(tokens){
  const top=[...tokens].sort((a,b)=>b.liquidity-a.liquidity).slice(0,6);
  if(!top.length){$("liquidityChart").innerHTML="<div class='empty-mini'>Tidak ada data market. Periksa status API pada bagian atas.</div>";return;}
  const max=Math.max(1,...top.map(x=>x.liquidity));
  $("liquidityChart").innerHTML=top.map(t=>`<div class="liq-row"><div class="liq-name">${esc(t.symbol)}<small>${esc(chainLabel(t.network))}</small></div><div class="liq-bar-bg"><div class="liq-bar" style="width:${Math.max(3,Math.round(t.liquidity/max*100))}%"></div></div><div class="liq-value">${compact(t.liquidity)}</div></div>`).join("");
+}
+function renderPipeline(){
+ const pipeline=state.overview?.pipeline;
+ if(!pipeline)return;
+ const basis=pipeline.basis,coverage=pipeline.coverage||{};
+ $("gateOverall").textContent=pipeline.overall||"FAIL CLOSED";
+ $("gateOverall").className="tiny-tag"+(pipeline.overall==="CHECKS COMPLETE"?"":" amber");
+ $("gateFocus").textContent=basis?
+   basis.symbol+" · "+chainLabel(basis.network)+(basis.inspectedAt?" · Data audit ada":" · Belum diaudit"):
+   "Belum ada kandidat";
+ $("gateCoverage").textContent="Security inspected: "+Number(coverage.inspected||0)+"/"+Number(coverage.total||0)+" token";
+ $("gateLastCheck").textContent=basis?.inspectedAt?
+    "Audit "+fmtWib(basis.inspectedAt)+" · ini bukan persetujuan BUY":
+    "Belum ada bukti audit untuk token acuan · WAIT tetap berlaku";
+ const label={market:"Market",liquidity:"Liquidity",holder:"Holder",wallet:"Wallet",socialAI:"SocialAI"};
+ for(const [name,suffix] of Object.entries(label)){
+   const gate=pipeline.gates?.[name]||{status:"WAITING",detail:"Belum ada data"};
+   const stateNode=$("gate"+suffix),detailNode=$("gateDetail"+suffix),dot=$("gateDot"+suffix);
+   const passed=["PASS","ACTIVE"].includes(gate.status);
+   const danger=["REJECT","BLOCKED"].includes(gate.status);
+   stateNode.textContent=gate.status;
+   stateNode.className="gate-state"+(passed?"":danger?" danger":gate.status==="NOT CHECKED"?" pending":" warn");
+   stateNode.title=gate.detail||"";
+   dot.className="gate-dot"+(passed?" ok":danger?" danger":gate.status==="PARTIAL"?" partial":"");
+   detailNode.textContent=gate.detail||"Belum ada bukti";
+ }
+ const available=!!basis&&!!state.overview.tokens.find(t=>t.id===basis.id);
+ $("gateOpenToken").disabled=!available;
+ $("gateOpenToken").textContent=available?"Lihat Bukti "+basis.symbol+" →":"Pilih Token di Radar";
 }
 function renderOverview(){
  const o=state.overview;if(!o)return;
@@ -62,7 +91,7 @@ function renderOverview(){
  const s=$("connectionState");
  s.className="network-state"+(o.sourceStatus==="LIVE"?"":" stale");
  s.innerHTML='<span class="pulse"></span>'+esc(o.sourceStatus==="LIVE"?"MARKET LIVE":o.sourceStatus==="PARTIAL"?"PARTIAL DATA":o.sourceStatus==="STALE"?"STALE DATA":"API "+o.sourceStatus);
- $("gateMarket").textContent=o.tokens.length?"Active":"Pending";
+ renderPipeline();
  const filtered=getVisible();$("tableCount").textContent=filtered.length;
  $("tokenRows").innerHTML=filtered.length?filtered.slice(0,100).map((t,i)=>tokenHtml(t,i)).join(""):`<tr><td colspan="9" class="table-empty">${o.errors.length?"Sebagian sumber gagal: "+esc(o.errors[0]):"Tidak ada token yang memenuhi filter saat ini."}</td></tr>`;
  const early=(o.tokens||[]).filter(t=>t.discovery==="New Pools"||t.discovery==="DEX Profiles"||["ACCUMULATION","NEW POOL","EARLY BREAKOUT"].includes(t.phase));
@@ -123,7 +152,7 @@ async function loadHistory(){
 }
 function openToken(id){
  const t=state.overview?.tokens.find(x=>x.id===id);
- if(!t)return;state.selected=t;
+ if(!t)return;state.selected=t;state.pipelineFocus=t.id;loadOverview(true);
  const rows=[["Liquidity Amount",t.liquidity>=100000?"MARKET PASS":"REJECT"],["LP Lock Status",t.liquidityLock||"UNVERIFIED"],["Holder ≤ 2.5%",t.holderMaxPct!=null?String(t.holderMaxPct.toFixed(2))+"% OBSERVED":"UNVERIFIED"],["Contract",t.security||"UNVERIFIED"],["Bundler / Wallet Cluster","UNVERIFIED"],["Sniper Analysis","UNVERIFIED"],["Smart Money","UNVERIFIED"],["Social Sentiment","INSUFFICIENT DATA"]];
  const safeUrl=/^https:\/\/(www\.)?(geckoterminal\.com|dexscreener\.com)\//.test(String(t.url||""))?t.url:"#";
  $("drawerContent").innerHTML=`<h2>${esc(t.symbol)} <span style="color:var(--green);font-size:12px">${esc(chainLabel(t.network))}</span></h2><div class="drawer-sub">${esc(t.tokenAddress)}</div><div class="drawer-grid"><div class="drawer-stat"><span>PRICE USD</span><b>${money(t.price)}</b></div><div class="drawer-stat"><span>LIQUIDITY</span><b>${compact(t.liquidity)}</b></div><div class="drawer-stat"><span>VOLUME 24H</span><b>${compact(t.volume24h)}</b></div><div class="drawer-stat"><span>PRICE CHANGE</span><b>${percent(t.change24h)}</b></div><div class="drawer-stat"><span>MARKET PHASE (rule-based)</span><b style="font-size:14px">${esc(t.phase)}</b></div><div class="drawer-stat"><span>ACTIVITY SCORE</span><b>${t.momentum}/100</b></div></div><h3>Security Validation — Blueprint V2.0</h3>${rows.map(([name,status])=>`<div class="checklist-item"><span>${esc(name)}</span><b>${esc(status)}</b></div>`).join("")}<div class="drawer-warning">⚠️ <b>WAIT — NOT VERIFIED.</b> Activity Score adalah metrik pasar sederhana, bukan AI Opportunity Score, Winrate, atau probabilitas TP. Tidak ada rekomendasi BUY sebelum seluruh pemeriksaan keamanan lolos.</div><div class="drawer-actions"><a class="btn btn-outline" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ GeckoTerminal</a><button class="btn btn-outline" id="inspectBtn">⬡ Periksa Security</button><button class="btn btn-outline" id="technicalBtn">▥ OHLCV MTF</button><button class="btn btn-primary" id="aiAnalyzeBtn">◇ Analisis AI</button></div><div id="inspectionEvidence" class="drawer-note">Memuat data on-chain terakhir...</div><div id="aiAnalysisResult" class="drawer-note">Analisis AI aktif setelah OPENAI_API_KEY dan DASHBOARD_ADMIN_KEY tersedia di Railway. AI hanya memberikan riset; sinyal tetap WAIT sampai validasi selesai.</div>`;
@@ -184,6 +213,7 @@ async function runInspection(kind){
   }else{
    toast("Pemeriksaan selesai; status tidak terverifikasi tetap WAIT.");
    await loadInspectionCache();
+   await loadOverview(true);
   }
  }catch(e){toast("Gagal memeriksa: "+e.message,true)}
  finally{btn.disabled=false;btn.textContent=old}
@@ -206,7 +236,7 @@ async function analyzeSelected(){
 async function loadOverview(silent=false){
  try {
   if(!silent)$("refreshButton").disabled=true;
-  const o=await api("/api/overview");state.overview=o;renderOverview();renderIntegrations();
+  const o=await api("/api/overview"+(state.pipelineFocus?"?focus="+encodeURIComponent(state.pipelineFocus):""));state.overview=o;renderOverview();renderIntegrations();
   if(o.sourceStatus!=="LIVE"&&!silent&&o.errors.length)toast("Beberapa API sumber belum merespons; data mungkin tidak lengkap.",true);
  }catch(e){$("connectionState").textContent="API OFFLINE";if(!silent)toast("Gagal memuat scanner: "+e.message,true);}finally{$("refreshButton").disabled=false;}
 }
@@ -247,6 +277,7 @@ document.addEventListener("click",e=>{
  if(e.target.closest("#aiAnalyzeBtn"))analyzeSelected();
  if(e.target.closest("#inspectBtn"))runInspection("security");
  if(e.target.closest("#technicalBtn"))runInspection("technical");
+ if(e.target.closest("#gateOpenToken")){const id=state.overview?.pipeline?.basis?.id;if(id)openToken(id);}
 });
 function updateAdminUi(){
  $("adminKeyState").textContent=state.adminAuthenticated?
