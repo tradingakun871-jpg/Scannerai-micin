@@ -134,6 +134,8 @@ app.get("*",(req,res)=>res.sendFile(path.join(root,"index.html")));
 app.use((err,req,res,next)=>{console.error("[http]",err);res.status(500).json({error:"Internal server error"})});
 let cycles=0;
 let workerRunning=false;
+let aiReviewsToday=0;
+let aiDay=new Date().toISOString().slice(0,10);
 async function worker(){
   if(workerRunning)return;
   workerRunning=true;
@@ -150,6 +152,19 @@ async function worker(){
         await saveInspection(token,evidence,decision);
         if(decision.eligible)await sendBuyAlert({token,decision});
       }catch(e){console.warn("[inspection]",token.id,String(e.message).slice(0,100))}
+    }
+    // Optional capped Claude/9Router research review; no BUY permission delegated to AI.
+    const today=new Date().toISOString().slice(0,10);
+    if(today!==aiDay){aiDay=today;aiReviewsToday=0}
+    const maxPerDay=Math.max(0,Math.min(144,Number(process.env.AI_MAX_DAILY_REVIEWS||48)));
+    if(providerStatus().configured && process.env.AI_AUTO_REVIEW!=="false" && aiReviewsToday<maxPerDay && eligible.length){
+      const token=eligible[cycles%eligible.length];
+      try{
+        const analysis=await analyzeToken(token,cachedInspection(token.id));
+        await saveReview(token,analysis);
+        aiReviewsToday++;
+        console.log("[AI review]",token.id,analysis.model,"WAIT");
+      }catch(err){console.warn("[AI review]",String(err.message).slice(0,130))}
     }
     cycles++;
   }catch(e){console.error("[worker]",String(e.message).slice(0,200))}
