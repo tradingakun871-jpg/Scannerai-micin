@@ -1,4 +1,5 @@
 const BASE = "https://api.geckoterminal.com/api/v2";
+const DEX = "https://api.dexscreener.com";
 const NETWORKS = [
   { id: "solana", label: "Solana", code: "SOL" },
   { id: "eth", label: "Ethereum", code: "ETH" },
@@ -75,6 +76,44 @@ function normalize(pool, network, source) {
     }
   };
 }
+async function dexDiscovery() {
+  const profiles=await loadJson(DEX+"/token-profiles/latest/v1");
+  const ids={solana:"solana",ethereum:"eth",bsc:"bsc",base:"base"};
+  const selected=(Array.isArray(profiles)?profiles:[]).filter(x=>ids[String(x.chainId||"").toLowerCase()]&&x.tokenAddress).slice(0,12);
+  const found=[];
+  // Bound request fanout for public-tier upstream APIs.
+  for(let i=0;i<selected.length;i+=3){
+    const group=selected.slice(i,i+3);
+    const result=await Promise.allSettled(group.map(async profile=>{
+      const net=ids[String(profile.chainId).toLowerCase()];
+      const pairs=await loadJson(DEX+"/token-pairs/v1/"+profile.chainId+"/"+encodeURIComponent(profile.tokenAddress));
+      const match=(Array.isArray(pairs)?pairs:[]).filter(p=>p.baseToken?.address?.toLowerCase()===String(profile.tokenAddress).toLowerCase())
+        .sort((a,b)=>asNum(b.liquidity?.usd)-asNum(a.liquidity?.usd))[0];
+      if(!match||asNum(match.priceUsd)<=0)return null;
+      const liq=asNum(match.liquidity?.usd),createdMs=Number(match.pairCreatedAt)||0;
+      const buys=asNum(match.txns?.h24?.buys),sells=asNum(match.txns?.h24?.sells),change24h=asNum(match.priceChange?.h24);
+      return {
+        id:net+":"+match.baseToken.address,network:net,networkName:NETWORKS.find(x=>x.id===net)?.label||net,
+        symbol:String(match.baseToken.symbol||"UNKNOWN").slice(0,28),
+        name:match.baseToken.name||match.baseToken.symbol||"Unknown",
+        tokenAddress:match.baseToken.address,poolAddress:match.pairAddress,
+        price:asNum(match.priceUsd),liquidity:liq,volume24h:asNum(match.volume?.h24),
+        change24h,buys,sells,marketCap:asNum(match.marketCap),fdv:asNum(match.fdv),
+        ageHours:createdMs?Math.max(0,(Date.now()-createdMs)/3600000):null,
+        createdAt:createdMs?new Date(createdMs).toISOString():null,
+        phase:change24h>28&&buys>sells?"EARLY BREAKOUT":createdMs&&Date.now()-createdMs<36*3600000?"NEW POOL":"DISCOVERY",
+        momentum:Math.round(Math.min(100,Math.max(0,change24h)+Math.log10(Math.max(1,liq))*8)),
+        discovery:"DEX Profiles",source:"DEX Screener",url:match.url||("https://dexscreener.com/"+profile.chainId+"/"+match.pairAddress),
+        liquidityCategory:liq>1000000?"LOCK_REQUIRED":liq>=100000?"UNLOCKED_REQUIRED":"BELOW_MINIMUM",
+        liquidityLock:"UNVERIFIED",holderMaxPct:null,bundlerSupplyPct:null,sniperSupplyPct:null,
+        security:"UNVERIFIED",social:"INSUFFICIENT DATA",signal:"WAIT",targetX:null,tpProbability:null,aiScore:null,
+        checks:{liquidityAmount:liq>=100000,liquidityLock:false,holder:false,contract:false,bundler:false,sniper:false,social:false,smartMoney:false}
+      };
+    }));
+    for(const item of result)if(item.status==="fulfilled"&&item.value)found.push(item.value);
+  }
+  return found;
+}
 function summarize(tokens) {
   const unique = new Set(tokens.map(x => x.id));
   return {
@@ -102,7 +141,7 @@ export async function scanMarkets(force = false) {
       {n, type:"Trending 24H", url:`${BASE}/networks/${n.id}/trending_pools?duration=24h`},
       {n, type:"New Pools", url:`${BASE}/networks/${n.id}/new_pools`}
     ]);
-    const results = await Promise.allSettled(jobs.map(j => loadJson(j.url)));
+    const [results,dexResult] = await Promise.all([Promise.allSettled(jobs.map(j => loadJson(j.url))),Promise.allSettled([dexDiscovery()])]);
     const found = new Map(); const errors = [];
     for (let i = 0; i < results.length; i++) {
       const j = jobs[i]; const result = results[i];
@@ -117,6 +156,12 @@ export async function scanMarkets(force = false) {
         if (!prior || (t.liquidity > prior.liquidity)) found.set(t.id, t);
       }
     }
+    if(dexResult[0].status==="fulfilled"){
+      for(const token of dexResult[0].value){
+        const prior=found.get(token.id);
+        if(!prior||token.liquidity>prior.liquidity)found.set(token.id,token);
+      }
+    } else errors.push("DEX Screener / Profiles: "+String(dexResult[0].reason?.message||"unavailable"));
     const tokens = [...found.values()].sort((a,b) => b.momentum - a.momentum || b.volume24h - a.volume24h);
     // Never substitute demo tokens on a provider error.
     const keepPrevious = !tokens.length && cache.tokens.length;
