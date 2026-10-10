@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "check": "node --check server/index.js && node --check server/scanner.js && node --check server/store.js && node --check server/ai.js && node --check server/intelligence.js && node --check server/technical.js && node --check server/signal.js && node --check server/telegram.js && node --check public/app.js && node --check server/solana.js && node --check server/social.js && node --check server/scoring.js && node --check server/model.js && node --check server/calibration.js && node --check server/evm.js && node --check server/admin-session.js",
+    "check": "node --check server/index.js && node --check server/scanner.js && node --check server/store.js && node --check server/ai.js && node --check server/intelligence.js && node --check server/technical.js && node --check server/signal.js && node --check server/telegram.js && node --check public/app.js && node --check server/solana.js && node --check server/social.js && node --check server/scoring.js && node --check server/model.js && node --check server/calibration.js && node --check server/evm.js && node --check server/admin-session.js && node --check server/pipeline.js",
     "prestart": "npm run check && npm test",
     "test": "node --test tests/*.test.js"
   },
