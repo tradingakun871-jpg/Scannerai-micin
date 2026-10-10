@@ -1,6 +1,7 @@
 import {getCalibrationCohorts} from "./store.js";
 import {fitCalibration} from "./calibration.js";
 let cache=null;
+const phaseResults=new Map();
 export async function calibratedFor(token){
   if(!cache||Date.now()-cache.at>30*60*1000){
     const cohorts=await getCalibrationCohorts();
@@ -13,9 +14,13 @@ export async function calibratedFor(token){
   if(cache.coverage<.9)return {verified:false,status:"MISSING_COHORT_BIAS",
     reason:"Fewer than 90% of matured cohorts have reliable 30D observations. Do not exclude delisted tokens.",
     sampleCount:cache.total,coverage:cache.coverage,horizon:"30D"};
-  return fitCalibration(cache.rows,token?.phase||"UNKNOWN");
+  const result=fitCalibration(cache.rows,token?.phase||"UNKNOWN");
+  phaseResults.set(token?.phase||"UNKNOWN",result);
+  return result;
 }
 export async function modelSummary(){
   const result=await calibratedFor({phase:"ACCUMULATION"});
   return {model:"Time-split empirical multiplier calibration",...result};
 }
+
+export function cachedCalibration(token){return phaseResults.get(token?.phase||'UNKNOWN')||null}
