@@ -65,7 +65,7 @@ function renderOverview(){
  $("gateMarket").textContent=o.tokens.length?"Active":"Pending";
  const filtered=getVisible();$("tableCount").textContent=filtered.length;
  $("tokenRows").innerHTML=filtered.length?filtered.slice(0,100).map((t,i)=>tokenHtml(t,i)).join(""):`<tr><td colspan="9" class="table-empty">${o.errors.length?"Sebagian sumber gagal: "+esc(o.errors[0]):"Tidak ada token yang memenuhi filter saat ini."}</td></tr>`;
- const early=(o.tokens||[]).filter(t=>t.discovery==="New Pools"||["ACCUMULATION","NEW POOL","EARLY BREAKOUT"].includes(t.phase));
+ const early=(o.tokens||[]).filter(t=>t.discovery==="New Pools"||t.discovery==="DEX Profiles"||["ACCUMULATION","NEW POOL","EARLY BREAKOUT"].includes(t.phase));
  $("earlyRows").innerHTML=early.length?early.slice(0,55).map((t,i)=>tokenHtml(t,i,true)).join(""):"<tr><td colspan='6' class='table-empty'>Belum ada early discovery dalam snapshot saat ini.</td></tr>";
  renderChart(o.tokens);
 }
@@ -73,26 +73,32 @@ function renderIntegrations(){
  const i=state.overview?.integrations;
  if(!i){$("integrationGrid").innerHTML="<div class='empty-mini'>Menunggu status integrasi...</div>";return;}
  const rows=[
-  ["GeckoTerminal","Market discovery live API","PUBLIC API",true],
-  ["DEX Screener","Market API backup / enrichment","PUBLIC API",true],
-  ["Helius","Solana holders, transfers","HELIUS_API_KEY",i.solana.helius],
-  ["Routescan","EVM token & transactions","ROUTESCAN_API_KEY",i.evm.routescan],
-  ["Alchemy","Ethereum, BSC, Base indexing","ALCHEMY_API_KEY",i.evm.alchemy],
-  ["GoPlus Security","Contract risk checks","GOPLUS_ACCESS_TOKEN",i.security.goplus],
-  ["Honeypot.is","Public honeypot endpoints","PUBLIC API",true],
-  ["StockGeist","Social sentiment data","STOCKGEIST_API_KEY",i.social.stockgeist],
-  ["Telegram Bot","Alerts after valid signal","TELEGRAM_BOT_TOKEN",i.social.telegram],
-  ["Claude AI","Anthropic analyst","ANTHROPIC_API_KEY",i.ai.provider==="anthropic"&&i.ai.configured],
-  ["9Router Combo AI","AISCANER gateway alternative","AI_BASE_URL + AI_API_KEY",i.ai.provider==="router"&&i.ai.configured],
-  ["PostgreSQL","History, journals, snapshots","DATABASE_URL",i.database.configured]
+  ["GeckoTerminal","Trending + New Pools","PUBLIC API",{configured:true,implemented:true}],
+  ["DEX Screener","Latest profiles + token pool market","PUBLIC API",i.market.dexscreener],
+  ["Helius","Solana full holder indexing","HELIUS_API_KEY",i.solana.helius],
+  ["Routescan","EVM top holders & transfer evidence (limited coverage)","ROUTESCAN_API_KEY",i.evm.routescan],
+  ["Alchemy","EVM RPC / wallet trace indexing","ALCHEMY_API_KEY",i.evm.alchemy],
+  ["GoPlus Security","Contract and LP holder risk data","GOPLUS_ACCESS_TOKEN",i.security.goplus],
+  ["Honeypot.is","EVM simulated buy/sell","PUBLIC API",i.security.honeypot],
+  ["StockGeist","Social sentiment","STOCKGEIST_API_KEY",i.social.stockgeist],
+  ["Telegram Bot","Verified BUY alerts only","TELEGRAM_BOT_TOKEN",i.notifications.telegram],
+  ["Claude AI","Anthropic research review","ANTHROPIC_API_KEY",{configured:i.ai.provider==="anthropic"&&i.ai.configured,implemented:true}],
+  ["9Router Combo AI","AISCANER alternative","AI_BASE_URL + AI_API_KEY",{configured:i.ai.provider==="router"&&i.ai.configured,implemented:true}],
+  ["PostgreSQL","Snapshots + forward evaluation","DATABASE_URL",{configured:i.database.configured,implemented:true}]
  ];
- $("integrationGrid").innerHTML=rows.map(([name,desc,env,configured])=>`<div class="integr-card"><div class="integr-top"><b>${esc(name)}</b><span class="integ-status ${configured?"connected":""}">${configured?"AVAILABLE":"SETUP"}</span></div><p>${esc(desc)}${env==="PUBLIC API"?" · Tidak memerlukan API key.":""}</p><code>${esc(env)}</code></div>`).join("");
+ $("integrationGrid").innerHTML=rows.map(([name,desc,env,config])=>{
+  const implemented=config?.implemented===true,configured=config?.configured===true;
+  const state=implemented?(configured?"CONFIGURED":"KEY MISSING"):"INTEGRATION PENDING";
+  return '<div class="integr-card"><div class="integr-top"><b>'+esc(name)+'</b><span class="integ-status '+(implemented&&configured?"connected":"")+'">'+state+'</span></div><p>'+esc(desc)+'</p><code>'+esc(env)+'</code></div>';
+ }).join("");
 }
 async function loadHistory(){
  try{
   const h=await api("/api/history");state.history=h;
   $("snapshotCount").textContent=h.rows.length;
   $("aiReviewCount").textContent=h.reviews.length;
+ if(h.summary){$("snapshotCount").title="Tracked unique tokens: "+h.summary.tracked+"; missing/stale: "+h.summary.stale;}
+
   if(!h.rows.length){$("historyChart").innerHTML=`<div class="empty-mini">${h.configured?"Belum ada snapshot yang tersimpan.":"Tambahkan PostgreSQL DATABASE_URL untuk menyimpan histori."}</div>`;}
   else{
    const rows=h.rows.slice(-24),max=Math.max(1,...rows.map(r=>Number(r.candidates)||0));
@@ -106,11 +112,49 @@ async function loadHistory(){
 function openToken(id){
  const t=state.overview?.tokens.find(x=>x.id===id);
  if(!t)return;state.selected=t;
- const rows=[["Liquidity Amount",t.liquidity>=100000?"MARKET PASS":"REJECT"],["LP Lock Status","UNVERIFIED"],["Holder ≤ 2.5%","UNVERIFIED"],["Contract / Honeypot","UNVERIFIED"],["Bundler / Wallet Cluster","UNVERIFIED"],["Sniper Analysis","UNVERIFIED"],["Smart Money","UNVERIFIED"],["Social Sentiment","INSUFFICIENT DATA"]];
+ const rows=[["Liquidity Amount",t.liquidity>=100000?"MARKET PASS":"REJECT"],["LP Lock Status",t.liquidityLock||"UNVERIFIED"],["Holder ≤ 2.5%",t.holderMaxPct!=null?String(t.holderMaxPct.toFixed(2))+"% OBSERVED":"UNVERIFIED"],["Contract",t.security||"UNVERIFIED"],["Bundler / Wallet Cluster","UNVERIFIED"],["Sniper Analysis","UNVERIFIED"],["Smart Money","UNVERIFIED"],["Social Sentiment","INSUFFICIENT DATA"]];
  const safeUrl=String(t.url||"").startsWith("https://www.geckoterminal.com/")?t.url:"#";
- $("drawerContent").innerHTML=`<h2>${esc(t.symbol)} <span style="color:var(--green);font-size:12px">${esc(chainLabel(t.network))}</span></h2><div class="drawer-sub">${esc(t.tokenAddress)}</div><div class="drawer-grid"><div class="drawer-stat"><span>PRICE USD</span><b>${money(t.price)}</b></div><div class="drawer-stat"><span>LIQUIDITY</span><b>${compact(t.liquidity)}</b></div><div class="drawer-stat"><span>VOLUME 24H</span><b>${compact(t.volume24h)}</b></div><div class="drawer-stat"><span>PRICE CHANGE</span><b>${percent(t.change24h)}</b></div><div class="drawer-stat"><span>MARKET PHASE (rule-based)</span><b style="font-size:14px">${esc(t.phase)}</b></div><div class="drawer-stat"><span>ACTIVITY SCORE</span><b>${t.momentum}/100</b></div></div><h3>Security Validation — Blueprint V2.0</h3>${rows.map(([name,status])=>`<div class="checklist-item"><span>${esc(name)}</span><b>${esc(status)}</b></div>`).join("")}<div class="drawer-warning">⚠️ <b>WAIT — NOT VERIFIED.</b> Activity Score adalah metrik pasar sederhana, bukan AI Opportunity Score, Winrate, atau probabilitas TP. Tidak ada rekomendasi BUY sebelum seluruh pemeriksaan keamanan lolos.</div><div class="drawer-actions"><a class="btn btn-outline" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ GeckoTerminal</a><button class="btn btn-primary" id="aiAnalyzeBtn">◇ Analisis Claude</button></div><div id="aiAnalysisResult" class="drawer-note">Analisis AI tersedia setelah ANTHROPIC_API_KEY dan DASHBOARD_ADMIN_KEY dikonfigurasi di Railway. AI hanya memberikan riset; sinyal tetap WAIT sampai validasi selesai.</div>`;
- $("tokenDrawer").classList.add("open");$("drawerOverlay").classList.add("open");$("tokenDrawer").setAttribute("aria-hidden","false");
+ $("drawerContent").innerHTML=`<h2>${esc(t.symbol)} <span style="color:var(--green);font-size:12px">${esc(chainLabel(t.network))}</span></h2><div class="drawer-sub">${esc(t.tokenAddress)}</div><div class="drawer-grid"><div class="drawer-stat"><span>PRICE USD</span><b>${money(t.price)}</b></div><div class="drawer-stat"><span>LIQUIDITY</span><b>${compact(t.liquidity)}</b></div><div class="drawer-stat"><span>VOLUME 24H</span><b>${compact(t.volume24h)}</b></div><div class="drawer-stat"><span>PRICE CHANGE</span><b>${percent(t.change24h)}</b></div><div class="drawer-stat"><span>MARKET PHASE (rule-based)</span><b style="font-size:14px">${esc(t.phase)}</b></div><div class="drawer-stat"><span>ACTIVITY SCORE</span><b>${t.momentum}/100</b></div></div><h3>Security Validation — Blueprint V2.0</h3>${rows.map(([name,status])=>`<div class="checklist-item"><span>${esc(name)}</span><b>${esc(status)}</b></div>`).join("")}<div class="drawer-warning">⚠️ <b>WAIT — NOT VERIFIED.</b> Activity Score adalah metrik pasar sederhana, bukan AI Opportunity Score, Winrate, atau probabilitas TP. Tidak ada rekomendasi BUY sebelum seluruh pemeriksaan keamanan lolos.</div><div class="drawer-actions"><a class="btn btn-outline" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ GeckoTerminal</a><button class="btn btn-outline" id="inspectBtn">⬡ Periksa Security</button><button class="btn btn-outline" id="technicalBtn">▥ OHLCV MTF</button><button class="btn btn-primary" id="aiAnalyzeBtn">◇ Analisis Claude</button></div><div id="aiAnalysisResult" class="drawer-note">Analisis AI tersedia setelah ANTHROPIC_API_KEY dan DASHBOARD_ADMIN_KEY dikonfigurasi di Railway. AI hanya memberikan riset; sinyal tetap WAIT sampai validasi selesai.</div>`;
+ $("tokenDrawer").classList.add("open");$("drawerOverlay").classList.add("open");$("tokenDrawer").setAttribute("aria-hidden","false");loadInspectionCache();
 }
+async function loadInspectionCache(){
+ const t=state.selected;if(!t)return;
+ try{
+ const out=await api("/api/inspection?tokenId="+encodeURIComponent(t.id));
+ if(state.selected?.id!==t.id)return;
+ if(!out.inspection)return;
+ const x=out.inspection;
+ const rows=[["GoPlus",x.security],["Honeypot",x.honeypot],["LP Lock",x.liquidityLock],
+ ["Holder",x.holders],["Bundler",x.bundler],["Sniper",x.sniper],
+ ["Wallet Cluster",x.walletClustering],["Smart Money",x.smartMoney],["Social",x.social]];
+ const markup=rows.map(([label,detail])=>'<div class="checklist-item"><span>'+esc(label)+
+ ' <small style="display:block;color:#7e919d">'+esc(detail?.reason||"Belum dianalisis")+'</small></span><b>'+esc(detail?.status||"UNVERIFIED")+'</b></div>').join("");
+ $("inspectionEvidence").innerHTML="<h3>Latest On-Chain Evidence</h3>"+markup+
+ "<p class='hint'>Last inspect: "+esc(fmtWib(x.inspectedAt))+" · status "+esc(out.decision?.status||"WAIT")+"</p>";
+ }catch(e){toast("Gagal memuat bukti: "+e.message,true)}
+}
+async function runInspection(kind){
+ const t=state.selected,btn=$(kind==="technical"?"technicalBtn":"inspectBtn");if(!t||!btn)return;
+ const key=sessionStorage.getItem("micin_admin_key");
+ if(!key){closeToken();setView("settings");toast("Set DASHBOARD_ADMIN_KEY di Railway dan masukkan kunci sesi.",true);return;}
+ btn.disabled=true;const old=btn.textContent;btn.textContent="Memeriksa...";
+ try{
+  const route=kind==="technical"?"/api/technical":"/api/inspect";
+  const out=await api(route,{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Key":key},
+    body:JSON.stringify({tokenId:t.id})});
+  if(kind==="technical"){
+    const tf=out.technical?.timeframes||{};
+    const lines=Object.entries(tf).map(([name,v])=>name+": "+(v.structure||v.status)+" · "+(v.bars||0)+" candles");
+    $("inspectionEvidence").innerHTML="<h3>OHLCV M5 / M15 / H1 / H4</h3><div class='drawer-note'>"+
+      esc(lines.join("\n"))+"</div><p class='hint'>Entry/SL research scenario only. No calibrated TP probability or active BUY.</p>";
+  }else{
+   toast("Pemeriksaan selesai; status tidak terverifikasi tetap WAIT.");
+   await loadInspectionCache();
+  }
+ }catch(e){toast("Gagal memeriksa: "+e.message,true)}
+ finally{btn.disabled=false;btn.textContent=old}
+}
+
 function closeToken(){$("tokenDrawer").classList.remove("open");$("drawerOverlay").classList.remove("open");$("tokenDrawer").setAttribute("aria-hidden","true");}
 async function analyzeSelected(){
  const t=state.selected,btn=$("aiAnalyzeBtn");if(!t||!btn)return;
@@ -146,7 +190,7 @@ async function manualRefresh(){
 function exportCsv(){
  const tokens=getVisible();if(!tokens.length){toast("Belum ada data untuk diekspor.",true);return;}
  const header=["network","symbol","token_address","price_usd","liquidity_usd","volume_24h_usd","change_24h_pct","buy_count","sell_count","phase","momentum_activity_score","lp_status","signal","url"];
- const csv=[header.join(","),...tokens.map(t=>[t.network,t.symbol,t.tokenAddress,t.price,t.liquidity,t.volume24h,t.change24h,t.buys,t.sells,t.phase,t.momentum,"UNVERIFIED","WAIT",t.url].map(v=>'"'+String(v??"").replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"').join(","))].join("\r\n");
+ const csv=[header.join(","),...tokens.map(t=>[t.network,t.symbol,t.tokenAddress,t.price,t.liquidity,t.volume24h,t.change24h,t.buys,t.sells,t.phase,t.momentum,t.liquidityLock,t.signal,t.url].map(v=>'"'+String(v??"").replace(/"/g,'""').replace(/^[=+\-@]/,"'$&")+'"').join(","))].join("\r\n");
  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
  a.href=url;a.download="micin-radar-"+new Date().toISOString().slice(0,10)+".csv";a.click();URL.revokeObjectURL(url);toast("CSV berhasil diunduh.");
 }
@@ -166,6 +210,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeToken();});
 document.addEventListener("click",e=>{
  const tr=e.target.closest("tr[data-token]");if(tr)openToken(tr.dataset.token);
  if(e.target.closest("#aiAnalyzeBtn"))analyzeSelected();
+ if(e.target.closest("#inspectBtn"))runInspection("security");
+ if(e.target.closest("#technicalBtn"))runInspection("technical");
 });
 $("saveAdminKey").addEventListener("click",()=>{const key=$("adminKeyInput").value.trim();if(!key){toast("Key tidak boleh kosong.",true);return;}sessionStorage.setItem("micin_admin_key",key);$("adminKeyInput").value="";$("adminKeyState").textContent="Admin key tersedia untuk sesi browser ini.";toast("Key disimpan untuk sesi ini (belum diverifikasi ke server).");});
 $("clearAdminKey").addEventListener("click",()=>{sessionStorage.removeItem("micin_admin_key");$("adminKeyInput").value="";$("adminKeyState").textContent="Belum ada key dalam sesi browser.";});
