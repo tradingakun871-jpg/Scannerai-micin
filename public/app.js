@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-const state={overview:null,view:"radar",selected:null,search:"",network:"all",mode:"all",history:null,notice:true};
+const state={overview:null,view:"radar",selected:null,search:"",network:"all",mode:"all",history:null,notice:true,adminAuthenticated:false};
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const n=x=>Number(x)||0;
 const compact=(x)=>{const v=n(x);if(v>=1e9)return "$"+(v/1e9).toFixed(2)+"B";if(v>=1e6)return "$"+(v/1e6).toFixed(2)+"M";if(v>=1e3)return "$"+(v/1e3).toFixed(v>1e5?0:1)+"K";return "$"+v.toFixed(0)};
@@ -8,7 +8,7 @@ const ago=x=>{if(!x)return "Belum dipindai";const m=Math.max(0,Math.floor((Date.
 const percent=x=>"<span class='percent "+(n(x)>=0?"up":"down")+"'>"+(n(x)>0?"+":"")+n(x).toFixed(1)+"%</span>";
 const chainLabel=c=>({solana:"SOL",eth:"ETH",bsc:"BSC",base:"BASE"})[c]||c.toUpperCase();
 const phrase=x=>String(x||"").replace(/_/g," ");
-const api=async(endpoint,opts={})=>{const r=await fetch(endpoint,{cache:"no-store",...opts});let d;try{d=await r.json()}catch{throw Error("Server tidak mengirim JSON");}if(!r.ok)throw Error(d.error||"HTTP "+r.status);return d};
+const api=async(endpoint,opts={})=>{const r=await fetch(endpoint,{cache:"no-store",credentials:"same-origin",...opts});let d;try{d=await r.json()}catch{throw Error("Server tidak mengirim JSON");}if(!r.ok)throw Error(d.error||"HTTP "+r.status);return d};
 function toast(message,isError=false){const t=document.createElement("div");t.className="toast"+(isError?" error":"");t.textContent=message;$("toastWrap").append(t);setTimeout(()=>t.remove(),5200);}
 function fmtWib(date){try{return new Intl.DateTimeFormat("id-ID",{timeZone:"Asia/Jakarta",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(date))+" WIB"}catch{return "—"}}
 function clock(){try{$("clock").textContent=new Intl.DateTimeFormat("id-ID",{timeZone:"Asia/Jakarta",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date())+" WIB"}catch{}}
@@ -170,12 +170,11 @@ async function loadInspectionCache(){
 }
 async function runInspection(kind){
  const t=state.selected,btn=$(kind==="technical"?"technicalBtn":"inspectBtn");if(!t||!btn)return;
- const key=sessionStorage.getItem("micin_admin_key");
- if(!key){closeToken();setView("settings");toast("Set DASHBOARD_ADMIN_KEY di Railway dan masukkan kunci sesi.",true);return;}
+ if(!state.adminAuthenticated){closeToken();setView("settings");toast("Login administrator diperlukan. Masukkan key satu kali pada Configuration.",true);return;}
  btn.disabled=true;const old=btn.textContent;btn.textContent="Memeriksa...";
  try{
   const route=kind==="technical"?"/api/technical":"/api/inspect";
-  const out=await api(route,{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Key":key},
+  const out=await api(route,{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({tokenId:t.id})});
   if(kind==="technical"){
     const tf=out.technical?.timeframes||{};
@@ -193,11 +192,10 @@ async function runInspection(kind){
 function closeToken(){$("tokenDrawer").classList.remove("open");$("drawerOverlay").classList.remove("open");$("tokenDrawer").setAttribute("aria-hidden","true");}
 async function analyzeSelected(){
  const t=state.selected,btn=$("aiAnalyzeBtn");if(!t||!btn)return;
- const key=sessionStorage.getItem("micin_admin_key");
- if(!key){toast("Masukkan DASHBOARD_ADMIN_KEY pada menu Configuration terlebih dahulu.",true);setView("settings");closeToken();return;}
+ if(!state.adminAuthenticated){toast("Login administrator diperlukan. Buka Configuration.",true);setView("settings");closeToken();return;}
  btn.disabled=true;btn.textContent="Menganalisis...";
  try{
-  const d=await api("/api/ai/analyze",{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Key":key},body:JSON.stringify({tokenId:t.id})});
+  const d=await api("/api/ai/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tokenId:t.id})});
   const a=d.analysis;
   const positives=Array.isArray(a.data.positives)?a.data.positives:[];
   const risks=Array.isArray(a.data.risks)?a.data.risks:[];
@@ -213,13 +211,15 @@ async function loadOverview(silent=false){
  }catch(e){$("connectionState").textContent="API OFFLINE";if(!silent)toast("Gagal memuat scanner: "+e.message,true);}finally{$("refreshButton").disabled=false;}
 }
 async function manualRefresh(){
- const key=sessionStorage.getItem("micin_admin_key");
- if(key)try{
+ if(state.adminAuthenticated)try{
   $("refreshButton").disabled=true;
-  await api("/api/scan",{method:"POST",headers:{"X-Admin-Key":key}});
+  await api("/api/scan",{method:"POST"});
   await loadOverview(true);
   toast("Pemindaian baru selesai.");return;
- }catch(e){toast("Manual scan: "+e.message,true);}
+ }catch(e){
+  if(/Login administrator|HTTP 401/.test(e.message)){state.adminAuthenticated=false;updateAdminUi();}
+  toast("Manual scan: "+e.message,true);
+ }
  await loadOverview();toast("Menampilkan snapshot server. Scan otomatis setiap 5 menit.");
 }
 function exportCsv(){
@@ -248,7 +248,49 @@ document.addEventListener("click",e=>{
  if(e.target.closest("#inspectBtn"))runInspection("security");
  if(e.target.closest("#technicalBtn"))runInspection("technical");
 });
-$("saveAdminKey").addEventListener("click",()=>{const key=$("adminKeyInput").value.trim();if(!key){toast("Key tidak boleh kosong.",true);return;}sessionStorage.setItem("micin_admin_key",key);$("adminKeyInput").value="";$("adminKeyState").textContent="Admin key tersedia untuk sesi browser ini.";toast("Key disimpan untuk sesi ini (belum diverifikasi ke server).");});
-$("clearAdminKey").addEventListener("click",()=>{sessionStorage.removeItem("micin_admin_key");$("adminKeyInput").value="";$("adminKeyState").textContent="Belum ada key dalam sesi browser.";});
-if(sessionStorage.getItem("micin_admin_key"))$("adminKeyState").textContent="Admin key tersedia untuk sesi browser ini.";
+function updateAdminUi(){
+ $("adminKeyState").textContent=state.adminAuthenticated?
+  "✓ LOGIN TERSIMPAN — Tetap aktif setelah browser ditutup. Masa berlaku 90 hari dan diperbarui saat digunakan.":
+  "Belum login administrator. Masukkan key sekali untuk login tersimpan.";
+ $("saveAdminKey").textContent=state.adminAuthenticated?"Perbarui login":"Masuk & Simpan Login";
+ $("clearAdminKey").textContent="Logout perangkat ini";
+}
+async function adminLogin(key,{notify=true}={}){
+ const login=await api("/api/admin/login",{
+  method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})
+ });
+ state.adminAuthenticated=login.authenticated===true;
+ updateAdminUi();
+ if(notify&&state.adminAuthenticated)toast("Login berhasil dan tersimpan lintas sesi browser.");
+ return state.adminAuthenticated;
+}
+async function checkAdminSession(){
+ try{
+  const session=await api("/api/admin/session");
+  state.adminAuthenticated=session.authenticated===true;
+  // Migrate a pre-upgrade session once, then securely stop storing the raw key in sessionStorage.
+  const legacy=sessionStorage.getItem("micin_admin_key");
+  if(legacy){
+   sessionStorage.removeItem("micin_admin_key");
+   if(!state.adminAuthenticated){
+    try{await adminLogin(legacy,{notify:false});}catch{/* Login can be re-entered in Configuration */}
+   }
+  }
+ }catch{state.adminAuthenticated=false;}
+ updateAdminUi();
+}
+$("saveAdminKey").addEventListener("click",async()=>{
+ const key=$("adminKeyInput").value.trim();
+ if(!key){toast("Masukkan DASHBOARD_ADMIN_KEY untuk login.",true);return;}
+ const button=$("saveAdminKey");button.disabled=true;
+ try{await adminLogin(key);}
+ catch(e){state.adminAuthenticated=false;updateAdminUi();toast("Gagal login: "+e.message,true);}
+ finally{$("adminKeyInput").value="";button.disabled=false;}
+});
+$("clearAdminKey").addEventListener("click",async()=>{
+ try{await api("/api/admin/logout",{method:"POST"});state.adminAuthenticated=false;
+   sessionStorage.removeItem("micin_admin_key");updateAdminUi();toast("Logout berhasil dari perangkat ini.");
+ }catch(e){toast("Logout gagal: "+e.message,true)}
+});
+checkAdminSession();
 clock();setInterval(clock,30000);loadOverview();setInterval(()=>{if(!document.hidden)loadOverview(true);},60000);
