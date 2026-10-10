@@ -1,3 +1,5 @@
+import {inspectSolanaHolders} from "./solana.js";
+import {socialMentions} from "./social.js";
 // Evidence-led enrichment: missing evidence NEVER becomes PASS.
 const CHAIN={eth:1,bsc:56,base:8453};
 const cache=new Map();
@@ -115,14 +117,18 @@ export async function inspectToken(t,{force=false}={}){
     const raw=t.network==="solana"?d.goplus?.result?.[t.tokenAddress]:
       d.goplus?.result?.[t.tokenAddress.toLowerCase()]||d.goplus?.result?.[t.tokenAddress];
     const flow=transferSignals(d.transfers,t);
+    const [solanaCensus,socialEvidence] = await Promise.all([
+      t.network==="solana"?inspectSolanaHolders(t.tokenAddress):Promise.resolve(null),
+      socialMentions(t)
+    ]);
     const out={
       tokenId:key,inspectedAt:new Date().toISOString(),errors,
       security:securityStatus(raw,t.network),
       honeypot:parseHoneypot(d.honeypot),
       liquidityLock:parseLp(raw,t),
-      holders:parseHolders(raw,d.holders),
+      holders:solanaCensus||parseHolders(raw,d.holders),
       ...flow,
-      social:{status:"INSUFFICIENT_DATA",reason:"Token-specific sentiment with verified contract identity not available; no fabricated positive score"},
+      social:socialEvidence,
       buyStatus:"WAIT", opportunityScore:null, calibratedProbability:null,
       sourceCoverage:endpoints.map(x=>({kind:x.kind,success:!!d[x.kind]}))
     };
