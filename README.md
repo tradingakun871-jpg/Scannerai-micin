@@ -88,3 +88,11 @@ npm start
 The application binds `PORT` supplied by Railway and does not require a separate worker, though production scaling to multiple web replicas would need a distributed lease to prevent duplicate scanning.
 
 **Data caveat:** Intraday liquidity, 24-hour volume and chart behavior do not mean a token is safe. No meme coin is guaranteed to appreciate; small-cap assets can lose all value.
+
+## Security Engine Phase 1 (2026-10-10)
+- Alchemy RPC examines last 10 blocks of Ethereum/Base/BNB ERC20 Transfer logs, participant `balanceOf`, `totalSupply`, and possible shared funders. This is a **bounded sample**, not a complete ERC20 holder index or a historical sniper classifier.
+- For compatible fungible-LP Uniswap-V2-style pools, an exact pool match is required before reading ERC20 LP `totalSupply` and burn-wallet `balanceOf`. Only a fully burned supply of the **exact pool** can independently pass the burn proof for liquidity over $1M; all other LP locker/V3/CLMM states remain UNVERIFIED.
+- Helius paginates Solana token accounts with a page cap and aggregates by owner, but excludes neither verified program/system accounts nor correlated clusters without evidence.
+- GoPlus security and Honeypot findings remain partial; critical confirmed flags may cause NO BUY.
+- Security inspection results cached 12 minutes and persisted to PostgreSQL; the backend cycles across the four chains (two candidates per 5-minute scan) to bound API cost.
+- The full 2.5% holder rule, same-controller wallets, bundler/sniper launch tracing, and exact small-pool UNLOCKED proof **do not pass** without authoritative evidence. BUY remains WAIT.
