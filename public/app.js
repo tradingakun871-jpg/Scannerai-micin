@@ -106,6 +106,17 @@ async function loadHistory(){
    const area="30,193 "+points+" 930,193";
    $("historyChart").innerHTML=`<svg class="history-svg" viewBox="0 0 960 225" preserveAspectRatio="none" role="img" aria-label="Jumlah kandidat per scan"><defs><linearGradient id="historyGrad" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#b4f66b" stop-opacity=".35"/><stop offset="1" stop-color="#b4f66b" stop-opacity="0"/></linearGradient></defs><line x1="28" y1="193" x2="940" y2="193" stroke="#35434e"/><line x1="28" y1="118" x2="940" y2="118" stroke="#263440" stroke-dasharray="4 7"/><line x1="28" y1="42" x2="940" y2="42" stroke="#263440" stroke-dasharray="4 7"/><polygon points="${area}" fill="url(#historyGrad)"/><polyline points="${points}" fill="none" stroke="#b4f66b" stroke-width="3" stroke-linejoin="round"/><text x="30" y="215" font-size="13" fill="#8194a3">Earliest scan</text><text x="835" y="215" font-size="13" fill="#8194a3">Latest</text><text x="20" y="28" font-size="13" fill="#a0b1bb">${max} candidates</text></svg>`;
   }
+  if(h.summary){
+    const list=h.summary.milestones||[];
+    let target=$("learningOutcome");
+    if(!target){target=document.createElement("div");target.id="learningOutcome";target.className="panel";
+      $("historyChart").closest(".panel").after(target)}
+    target.innerHTML='<div class="panel-head"><div><div class="overline">FORWARD MONITORING</div><h3>Token Outcome Observations</h3></div><span class="tiny-tag amber">UNVALIDATED</span></div>'+
+      '<p class="hint">Tracked: '+esc(h.summary.tracked)+' · Lost/stale: '+esc(h.summary.stale)+
+      ' · Inspections: '+esc(h.summary.inspections)+' — Price touch 2X/5X is NOT realized PnL.</p>'+
+      (list.length?list.map(m=>'<div class="config-item"><span>'+esc(m.horizon)+' · '+esc(m.samples)+' samples</span><b>2X touch '+esc(m.hit_2x)+' · 5X touch '+esc(m.hit_5x)+'</b></div>').join(""):
+       '<p class="hint">Menunggu cohort forward mencapai horizon pertama.</p>');
+  }
   $("reviewList").innerHTML=h.reviews.length?h.reviews.map(x=>`<div class="review-row"><b>${esc(x.token_symbol)} · ${esc(chainLabel(x.chain))} — <span class="waiting">${esc(x.recommendation)}</span></b><small style="float:right">${fmtWib(x.created_at)}</small><p>${esc(x.explanation)}</p><small>Model: ${esc(x.model)} / ${esc(x.provider)}</small></div>`).join(""):"<div class='reviews-placeholder'>Belum ada AI review yang tersimpan. Hubungkan Claude dan PostgreSQL untuk mencatatnya.</div>";
  }catch(e){toast(e.message,true);}
 }
