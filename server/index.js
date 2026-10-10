@@ -7,6 +7,7 @@ import {analyzeToken,providerStatus} from "./ai.js";
 import {inspectToken,cachedInspection,inspectionStats} from "./intelligence.js";
 import {technicalAnalysis} from "./technical.js";
 import {decideSignal} from "./signal.js";
+import {computeOpportunity} from "./scoring.js";
 import {sendBuyAlert,telegramReady} from "./telegram.js";
 
 const app=express();
@@ -45,7 +46,8 @@ const recentCalls=new Map();
 function tokenById(id){return scanStatus().tokens.find(t=>t.id===id)}
 function visibleToken(token){
   const evidence=cachedInspection(token.id);
-  const decision=decideSignal(token,evidence);
+  const score=computeOpportunity(token,evidence);
+  const decision=decideSignal(token,evidence,null,score.opportunityScore);
   return {...token,
     security:evidence?.security?.status||"UNVERIFIED",
     holderMaxPct:evidence?.holders?.topObservedPct??null,
@@ -53,7 +55,7 @@ function visibleToken(token){
     signal:decision.status,checks:decision.checks,
     inspectionAt:evidence?.inspectedAt||null,
     evidenceErrors:evidence?.errors||[],
-    aiScore:decision.eligible?null:null,
+    aiScore:score.opportunityScore,opportunity:score,
     tpProbability:null, targetX:null};
 }
 app.get("/api/health",(req,res)=>{
@@ -88,8 +90,9 @@ app.get("/api/inspection",(req,res)=>{
   const token=tokenById(id);
   if(!token)return res.status(404).json({error:"Token tidak ditemukan dalam pemindaian terkini"});
   const inspection=cachedInspection(id);
-  return res.json({token:{id:token.id,symbol:token.symbol,network:token.network},
-    inspection,decision:decideSignal(token,inspection),
+  const score=computeOpportunity(token,inspection);
+  return res.json({opportunity:score,token:{id:token.id,symbol:token.symbol,network:token.network},
+    inspection,decision:decideSignal(token,inspection,null,score.opportunityScore),
     verified:false,note:"Data missing is treated as UNVERIFIED; partial on-chain evidence is not a full risk audit."});
 });
 app.post("/api/inspect",safeAdmin,async(req,res)=>{
@@ -99,10 +102,11 @@ app.post("/api/inspect",safeAdmin,async(req,res)=>{
     const inspection=await inspectToken(token,{force:!!req.body?.force});
     const includeTechnical=req.body?.withTechnical===true;
     const technical=includeTechnical?await technicalAnalysis(token):null;
-    const decision=decideSignal(token,inspection,technical);
+    const score=computeOpportunity(token,inspection);
+    const decision=decideSignal(token,inspection,technical,score.opportunityScore);
     await saveInspection(token,inspection,decision);
     await sendBuyAlert({token,decision});
-    res.json({token:{id:token.id,symbol:token.symbol},inspection,technical,decision});
+    res.json({token:{id:token.id,symbol:token.symbol},inspection,technical,opportunity:score,decision});
   }catch(e){console.error("[inspect]",e.message);res.status(502).json({error:"Pemeriksaan provider tidak selesai: "+String(e.message).slice(0,130)})}
 });
 app.post("/api/scan",safeAdmin,async(req,res)=>{
@@ -148,7 +152,8 @@ async function worker(){
     for(const token of eligible){
       try{
         const evidence=await inspectToken(token);
-        const decision=decideSignal(token,evidence);
+        const score=computeOpportunity(token,evidence);
+        const decision=decideSignal(token,evidence,null,score.opportunityScore);
         await saveInspection(token,evidence,decision);
         if(decision.eligible)await sendBuyAlert({token,decision});
       }catch(e){console.warn("[inspection]",token.id,String(e.message).slice(0,100))}
