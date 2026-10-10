@@ -1,45 +1,87 @@
 # MICIN RADAR — AI Meme Coin Early Gem Hunter V2.0
 
-Production-oriented dashboard and discovery scanner for Solana, Ethereum, BNB Chain and Base, built to preserve the locked Blueprint V2.0.
+**Production URL:** https://micin-radar-web-production.up.railway.app/
 
-## Safety first
-- No invented BUY signals, holder counts, social metrics, bundler/sniper results or TP probabilities.
-- Token discovery works with public GeckoTerminal APIs immediately.
-- BUY stays WAIT/UNVERIFIED until contract security, holder concentration, LP status, social evidence and bundler/sniper verification are complete.
-- Liquidity $100k–$1m requires **unlocked** (high risk); over $1m requires **locked/burned**; single non-system holder / proven same-control cluster <=2.5%.
-- This service never executes trades.
+**Status:** Dashboard/market scanner/forward ledger are live. Blueprint V2.0 is locked. This is a research scanner, **not a completed verified BUY system**; active BUY is blocked until ALL mandatory third-party evidence, smart money/social confirmation and probability calibration are complete.
 
-## Deployment
-Deploy this repository on Railway as a Node service. The server listens on `process.env.PORT` and serves the dashboard and API. Optional PostgreSQL provides persistent scan snapshots and AI review logs.
+## Live features in source
+- 5-minute background worker while service is running, with duplicate-run guard.
+- GeckoTerminal new/trending pools and DEX Screener latest profiles/pool enrichment (four networks).
+- Market data rankings, filters, CSV export, responsive dashboard.
+- GoPlus token-contract risk flags and LP *holder indications*; Honeypot.is simulated trade on supported EVM DEXes.
+- Routescan ERC20 top-holder list and sampled transfer evidence; Helius getTokenAccounts paged census (requires key).
+- Bundler/sniper/wallet cluster indicators derived from sampled transfers; **not proof of common control**.
+- ApeWisdom Reddit crypto-ticker mention counts; **not contract-authenticated social sentiment**.
+- On-demand GeckoTerminal M5 / M15 / H1 / H4 OHLCV calculations and research-only support/SL scenarios.
+- Opportunity Score with exact blueprint weights, held as unavailable when components are missing.
+- Protected Claude AI / 9Router commentary, with optional one review per scan and max 48 daily if configured.
+- PostgreSQL full token observations, first detection, 1H / 6H / 12H / 24H / 7D / 30D cohorts, risk and AI journals.
+- Chronological train/forward empirical 30D multiplier calibration with sample-size and coverage gates. **No verified predictions until data maturity.**
+- Telegram sender that refuses to send unverified BUY alerts.
+- Syntax and BUY-policy regression tests on Railway startup.
 
-Run: `npm install && npm start`
+## Blocking validations
+1. Liquidity lock must be independently matched to the *exact pool / position*; generic GoPlus LP-holders data is not sufficient for CLMM/V3.
+2. Holder 2.5% rule needs reliable full-system-wallet exemptions and proven wallet groupings.
+3. Bundler/sniper links and developer-funded coordination need full historical traces, not merely same-block transfer samples.
+4. Social evidence needs token-specific verified data; ticker mentions can be spoofed.
+5. Smart money profitability requires verified wallet history.
+6. Actual Claude API key has not been provided.
+7. Statistical TP model needs several hundred **matured 30D** cohorts and independent forward validation; no historical data can be conjured.
+8. No auto trade is implemented (intentional).
 
-### Railway environment variables (set later)
-```env
-PORT=3000
-DATABASE_URL=
-DASHBOARD_ADMIN_KEY=
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=
-AI_BASE_URL=
-AI_API_KEY=
-AI_MODEL=AISCANER
+## Configure in Railway Variables
+Service: `micin-radar-web`, project: `Scannerai-micin`. **Never paste API credentials into GitHub or a public frontend.**
+
+```dotenv
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+DASHBOARD_ADMIN_KEY=your_secret_here
 AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your_anthropic_key_here
+ANTHROPIC_MODEL=claude-sonnet-4-5
+AI_AUTO_REVIEW=true
+AI_MAX_DAILY_REVIEWS=48
+
+# Optional 9Router mode:
+# AI_PROVIDER=router
+# AI_BASE_URL=https://YOUR_SECURE_9ROUTER_DOMAIN/v1
+# AI_API_KEY=secret
+# AI_MODEL=AISCANER
+
+# Optional integrations:
 HELIUS_API_KEY=
-ALCHEMY_API_KEY=
 ROUTESCAN_API_KEY=
 GOPLUS_ACCESS_TOKEN=
+ALCHEMY_API_KEY=
+STOCKGEIST_API_KEY=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 ```
-Only set secrets in Railway Variables. Never commit actual keys.
 
-## Built-in workflow
-- Every 5 minutes: discover trending and newly created pools via GeckoTerminal across four chains, cache and snapshot results, report provider errors explicitly.
-- Public GET `/api/overview`, `/api/health`, `/api/history` (read-only).
-- Protected POST `/api/scan` and `/api/ai/analyze` require `X-Admin-Key` matching `DASHBOARD_ADMIN_KEY`.
-- Claude AI analysis accepts verified market snapshots and produces commentary; **the AI cannot override validation rules**.
-- Signal execution is disabled pending complete verification modules and integration credentials.
+Helius holder census is bounded at four pages (4,000 token accounts) by default to avoid exhausting public-tier credits. Data coverage is disclosed. Routescan supports Ethereum and may not return holder data on every EVM chain/pool.
 
-## Status
-Dashboard and market scanner are deployable without API keys. Chain holder indexing, LP verification, sniper/bundler tracing, social intelligence, verified AI TP probabilities and Telegram delivery are marked integration-pending rather than simulated.
+## HTTP API
+- `GET /api/health` — freshness, uptime
+- `GET /api/overview` — discovery data with verified/partial flags
+- `GET /api/integrations` — readiness (configured is not verified)
+- `GET /api/history` — persistent observations & historical cohorts
+- `GET /api/model-status` — statistical calibration/readiness state
+- `GET /api/inspection?tokenId=...` — cached evidence, no API spending
+- `POST /api/inspect` — protected, fetch on-chain evidence
+- `POST /api/technical` — protected, fetch MTF OHLCV
+- `POST /api/ai/analyze` — protected, call Claude or 9Router
+- `POST /api/scan` — protected, trigger scan
+
+Protected calls require `X-Admin-Key` equal to `DASHBOARD_ADMIN_KEY` in Railway.
+
+## Development
+```bash
+npm install
+npm run check
+npm test
+npm start
+```
+
+The application binds `PORT` supplied by Railway and does not require a separate worker, though production scaling to multiple web replicas would need a distributed lease to prevent duplicate scanning.
+
+**Data caveat:** Intraday liquidity, 24-hour volume and chart behavior do not mean a token is safe. No meme coin is guaranteed to appreciate; small-cap assets can lose all value.
