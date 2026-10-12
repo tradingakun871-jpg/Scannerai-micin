@@ -211,6 +211,13 @@ async function worker(){
     const state=await scanMarkets(true);
     const stored=await persistScan(state);
     console.log("[scanner]",state.sourceStatus,"observed",state.tokens.length,"errors",state.errors.length,"DB",stored);
+    if(state.dexStats)console.log("[dex-market]",
+      "profiles",state.dexStats.feeds?.TOKEN_PROFILE??"N/A",
+      "boostLatest",state.dexStats.feeds?.BOOST_LATEST??"N/A",
+      "boostTop",state.dexStats.feeds?.BOOST_TOP??"N/A",
+      "addresses",state.dexStats.requestedAddresses,
+      "matched",state.dexStats.matchedTokens,
+      "batch",state.dexStats.batchSucceeded+"/"+state.dexStats.batchRequests);
     // Bounded inspection of candidates, preserving public-tier rates.
     const candidates=state.tokens.filter(t=>t.liquidity>=100000&&t.price>0);
     const networks=["solana","eth","bsc","base"];
