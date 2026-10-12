@@ -139,7 +139,7 @@ app.get("/api/overview",async(req,res)=>{
   });
   res.json({app:"MICIN RADAR",version:"2.0",lastScan:s.scannedAt,started:s.scanStartedAt,
     sourceStatus:s.sourceStatus,loading:s.loading,durationMs:s.lastScanDurationMs,
-    metrics:s.metrics,errors:s.errors,pipeline,filters:{network,mode,search},
+    metrics:s.metrics,errors:s.errors,pipeline,dexMarket:s.dexStats||null,filters:{network,mode,search},
     tokens:tokens.slice(0,120).map(visibleToken),totalFiltered:tokens.length,networkOptions:NETWORKS,
     integrations:sources(),policy:{liquidityMinimum:100000,largePoolThreshold:1000000,maxHolderPct:2.5,
       autoTrade:false,blueprint:"LOCKED"},disclaimer:"BUY cannot be issued until all on-chain, social, technical and statistical checks are independently verified."});
