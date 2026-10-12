@@ -2,7 +2,7 @@ const SYSTEM = `You are a conservative Indonesian-language research analyst for 
 Never invent blockchain checks, liquidity lock status, holder distribution, bundler/sniper evidence, social sentiment, profit probabilities, or a BUY recommendation.
 You receive public market discovery data only. Analyze momentum and explain risks, NEVER treat discovery as verified investment advice.
 Return JSON only: {"summary":"...","positives":["..."],"risks":["..."],"technical_view":"...","suggested_action":"WAIT"}.
-Use Bahasa Indonesia. Max 3 items per array. NO trading instruction; no unsupported numeric targets.`;
+Use Bahasa Indonesia. Max 3 items per array. NO trading instruction; no unsupported numeric targets. DEX Screener promotions and boosts are paid visibility, not confirmation of organic buying; distinguish M5/H1/H6/H24 price and volume from on-chain security. If poolMatched is false, do not interpret DEX windows as data for the displayed primary pool.`;
 const withTimeout = async (url, options, ms=25000) => {
   const c=new AbortController();const timer=setTimeout(()=>c.abort(),ms);
   try {const r=await fetch(url,{...options,signal:c.signal}); const body=await r.text();
@@ -42,6 +42,16 @@ export async function analyzeToken(token,inspection=null){
     price:token.price,liquidity_usd:token.liquidity,volume_24h:token.volume24h,
     price_change_24h_pct:token.change24h,buys_24h:token.buys,sells_24h:token.sells,
     detected_market_phase:token.phase,
+    dex_market_data:token.dex?{
+      windows:token.dex.poolMatched?token.dex.windows:null,
+      poolMatched:token.dex.poolMatched===true,
+      observedAt:token.dex.observedAt,
+      paidPromotion:token.dex.promotion?.promoted===true,
+      boostActive:token.dex.promotion?.boostActive||0,
+      websiteCount:token.dex.links?.websites?.length||0,
+      socialAccountCount:token.dex.links?.socials?.length||0,
+      warning:"Boost/ads/links are promotional metadata, NOT organic holder or verified sentiment evidence"
+    }:null,
     mandatory_checks:{
       lp_lock:inspection?.liquidityLock||"NOT VERIFIED",holder_max_2_5_pct:inspection?.holders||"NOT VERIFIED",
       bundler:inspection?.bundler||"NOT VERIFIED",sniper:inspection?.sniper||"NOT VERIFIED",
