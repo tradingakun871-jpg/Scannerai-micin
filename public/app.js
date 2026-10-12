@@ -41,9 +41,9 @@ function getVisible(){
  });
 }
 function tokenHtml(t,i,early=false){
- if(early)return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(t.discovery)}</small></div></div></td><td><span class="chain-pill">${esc(chainLabel(t.network))}</span></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td><span class="phase-pill early">${esc(t.phase)}</span></td><td><span class="waiting">${esc(t.signal||"WAIT")}</span></td></tr>`;
+ if(early)return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(t.discovery)}${t.dex?.promotion?.promoted?" · PROMOTED":""}</small></div></div></td><td><span class="chain-pill">${esc(chainLabel(t.network))}</span></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td><span class="phase-pill early">${esc(t.phase)}</span></td><td><span class="waiting">${esc(t.signal||"WAIT")}</span></td></tr>`;
  const phaseClass=["EARLY BREAKOUT","ACCUMULATION","NEW POOL"].includes(t.phase)?"early":t.phase==="DISTRIBUTION"?"risk":"";
- return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(chainLabel(t.network))} · ${esc(t.discovery)}</small></div></div></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td>${percent(t.change24h)}</td><td><span class="percent up">${n(t.buys).toLocaleString("id-ID")}</span> / <span class="percent down">${n(t.sells).toLocaleString("id-ID")}</span></td><td><span class="phase-pill ${phaseClass}">${esc(t.phase)}</span></td><td><span class="activity-wrap"><span class="activity-bar"><i style="width:${Math.max(0,Math.min(100,n(t.momentum)))}%"></i></span><small>${n(t.momentum)}/100</small></span></td><td><span class="waiting">${esc(t.signal||"WAIT")}</span></td><td class="row-arrow">›</td></tr>`;
+ return `<tr data-token="${esc(t.id)}"><td><div class="coin-cell"><div class="token-logo">${esc(t.symbol.slice(0,2).toUpperCase())}</div><div><b>${esc(t.symbol)}</b><small>${esc(chainLabel(t.network))} · ${esc(t.discovery)}${t.dex?.promotion?.promoted?" · PROMOTED":""}</small></div></div></td><td><strong>${compact(t.liquidity)}</strong></td><td>${compact(t.volume24h)}</td><td>${percent(t.change24h)}</td><td><span class="percent up">${n(t.buys).toLocaleString("id-ID")}</span> / <span class="percent down">${n(t.sells).toLocaleString("id-ID")}</span></td><td><span class="phase-pill ${phaseClass}">${esc(t.phase)}</span></td><td><span class="activity-wrap"><span class="activity-bar"><i style="width:${Math.max(0,Math.min(100,n(t.momentum)))}%"></i></span><small>${n(t.momentum)}/100</small></span></td><td><span class="waiting">${esc(t.signal||"WAIT")}</span></td><td class="row-arrow">›</td></tr>`;
 }
 function renderChart(tokens){
  const top=[...tokens].sort((a,b)=>b.liquidity-a.liquidity).slice(0,6);
@@ -87,7 +87,8 @@ function renderOverview(){
  $("metricBuys").textContent="0";$("metricChains").textContent=o.metrics.chains||4;
  $("signalNavCount").textContent="0";
  $("lastScanText").textContent=o.lastScan?("Diperbarui "+fmtWib(o.lastScan)+" · "+ago(o.lastScan)):"Belum ada scan berhasil";
- $("tableFoot").textContent=o.sourceStatus==="LIVE"?"Data market publik · LIQUIDITY LOCK belum diverifikasi":o.sourceStatus==="PARTIAL"?"Sebagian sumber data tidak tersedia; jangan anggap daftar lengkap.":"Scanner source: "+o.sourceStatus;
+ const ds=o.dexMarket,coverage=ds?" · DEX token "+Number(ds.matchedTokens||0)+" · batch "+Number(ds.batchSucceeded||0)+"/"+Number(ds.batchRequests||0):"";
+  $("tableFoot").textContent=(o.sourceStatus==="LIVE"?"Data market publik; keamanan belum otomatis PASS":o.sourceStatus==="PARTIAL"?"Sebagian sumber data gagal; cakupan market parsial":"Scanner source: "+o.sourceStatus)+coverage;
  const s=$("connectionState");
  s.className="network-state"+(o.sourceStatus==="LIVE"?"":" stale");
  s.innerHTML='<span class="pulse"></span>'+esc(o.sourceStatus==="LIVE"?"MARKET LIVE":o.sourceStatus==="PARTIAL"?"PARTIAL DATA":o.sourceStatus==="STALE"?"STALE DATA":"API "+o.sourceStatus);
@@ -150,12 +151,42 @@ async function loadHistory(){
   $("reviewList").innerHTML=h.reviews.length?h.reviews.map(x=>`<div class="review-row"><b>${esc(x.token_symbol)} · ${esc(chainLabel(x.chain))} — <span class="waiting">${esc(x.recommendation)}</span></b><small style="float:right">${fmtWib(x.created_at)}</small><p>${esc(x.explanation)}</p><small>Model: ${esc(x.model)} / ${esc(x.provider)}</small></div>`).join(""):"<div class='reviews-placeholder'>Belum ada AI review yang tersimpan. Hubungkan AI Provider dan PostgreSQL untuk mencatatnya.</div>";
  }catch(e){toast(e.message,true);}
 }
+function dexInsights(t){
+ const d=t.dex;if(!d)return '<div class="dex-intelligence"><h3>DEX Screener Market Intelligence</h3><p class="dex-note">Data multi-window DEX Screener belum tersedia untuk token ini. GeckoTerminal tetap menjadi sumber pasar bila tersedia.</p></div>';
+ const fmt=v=>v===null||v===undefined?"—":Number(v).toLocaleString("id-ID");
+ const chg=v=>v===null||v===undefined?"—":(Number(v)>0?"+":"")+Number(v).toFixed(2)+"%";
+ const moneyUsd=v=>v===null||v===undefined?"—":compact(v);
+ const tags=(d.labels||[]).map(x=>'<span class="dex-tag">'+esc(String(x).replace(/_/g," "))+'</span>').join(" ");
+ const boosted=d.promotion?.promoted===true;
+ const rows=["m5","h1","h6","h24"].map(period=>{
+   const w=d.windows?.[period]||{};
+   return '<tr><td><b>'+period.toUpperCase()+'</b></td><td>'+chg(w.change)+'</td><td>'+moneyUsd(w.volume)+
+    '</td><td>'+fmt(w.buys)+' / '+fmt(w.sells)+'</td></tr>';
+ }).join("");
+ const poolValid=d.poolMatched===true;
+ const social=(d.links?.socials||[]).map(x=>esc(x.platform)).join(", ")||"—";
+ const marketing=boosted?
+   '<span class="dex-promoted">PROMOTED / BOOSTED</span><p class="dex-note">Promosi atau boost terdeteksi. Ini dapat meningkatkan visibilitas secara berbayar dan bukan bukti akumulasi organik atau keamanan token.</p>':
+   '<span class="dex-ordinary">No paid promotion seen in sampled feeds</span>';
+ const matched=poolValid?"DEX pair dipakai untuk data market token ini.":
+   "Perhatian: data DEX berasal dari pool berbeda dari harga utama. Tabel tidak boleh dianggap harga pool yang ditampilkan.";
+ return '<div class="dex-intelligence"><h3>DEX Screener — 5M / H1 / H6 / H24</h3>'+
+   '<p class="dex-note">'+esc(matched)+'</p>'+marketing+
+   (poolValid?'<div class="dex-table-wrap"><table class="dex-table"><thead><tr><th>TF</th><th>PRICE Δ</th><th>VOLUME</th><th>BUY / SELL</th></tr></thead><tbody>'+rows+'</tbody></table></div>':
+   '<p class="dex-note">Data jendela DEX disembunyikan untuk mencegah pencampuran pool.</p>')+
+   '<p class="dex-note">DEX: '+esc(d.dexId||"Unknown")+' · Total pool diamati: '+fmt(d.poolCount)+
+   ' · Boost aktif: '+fmt(d.promotion?.boostActive??0)+
+   ' · Social links: '+esc(social)+
+   ' · Observasi: '+esc(fmtWib(d.observedAt))+'</p><div class="dex-tags">'+tags+'</div>'+
+   '<p class="dex-note">Data sosial berupa tautan profil, bukan analisis sentimen terverifikasi. Pemeriksaan LP, holder, honeypot, bundler dan sniper tetap terpisah.</p></div>';
+}
+
 function openToken(id){
  const t=state.overview?.tokens.find(x=>x.id===id);
  if(!t)return;state.selected=t;state.pipelineFocus=t.id;loadOverview(true);
  const rows=[["Liquidity Amount",t.liquidity>=100000?"MARKET PASS":"REJECT"],["LP Lock Status",t.liquidityLock||"UNVERIFIED"],["Holder ≤ 2.5%",t.holderMaxPct!=null?String(t.holderMaxPct.toFixed(2))+"% OBSERVED":"UNVERIFIED"],["Contract",t.security||"UNVERIFIED"],["Bundler / Wallet Cluster","UNVERIFIED"],["Sniper Analysis","UNVERIFIED"],["Smart Money","UNVERIFIED"],["Social Sentiment","INSUFFICIENT DATA"]];
  const safeUrl=/^https:\/\/(www\.)?(geckoterminal\.com|dexscreener\.com)\//.test(String(t.url||""))?t.url:"#";
- $("drawerContent").innerHTML=`<h2>${esc(t.symbol)} <span style="color:var(--green);font-size:12px">${esc(chainLabel(t.network))}</span></h2><div class="drawer-sub">${esc(t.tokenAddress)}</div><div class="drawer-grid"><div class="drawer-stat"><span>PRICE USD</span><b>${money(t.price)}</b></div><div class="drawer-stat"><span>LIQUIDITY</span><b>${compact(t.liquidity)}</b></div><div class="drawer-stat"><span>VOLUME 24H</span><b>${compact(t.volume24h)}</b></div><div class="drawer-stat"><span>PRICE CHANGE</span><b>${percent(t.change24h)}</b></div><div class="drawer-stat"><span>MARKET PHASE (rule-based)</span><b style="font-size:14px">${esc(t.phase)}</b></div><div class="drawer-stat"><span>ACTIVITY SCORE</span><b>${t.momentum}/100</b></div></div><h3>Security Validation — Blueprint V2.0</h3>${rows.map(([name,status])=>`<div class="checklist-item"><span>${esc(name)}</span><b>${esc(status)}</b></div>`).join("")}<div class="drawer-warning">⚠️ <b>WAIT — NOT VERIFIED.</b> Activity Score adalah metrik pasar sederhana, bukan AI Opportunity Score, Winrate, atau probabilitas TP. Tidak ada rekomendasi BUY sebelum seluruh pemeriksaan keamanan lolos.</div><div class="drawer-actions"><a class="btn btn-outline" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ GeckoTerminal</a><button class="btn btn-outline" id="inspectBtn">⬡ Periksa Security</button><button class="btn btn-outline" id="technicalBtn">▥ OHLCV MTF</button><button class="btn btn-primary" id="aiAnalyzeBtn">◇ Analisis AI</button></div><div id="inspectionEvidence" class="drawer-note">Memuat data on-chain terakhir...</div><div id="aiAnalysisResult" class="drawer-note">Analisis AI aktif setelah OPENAI_API_KEY dan DASHBOARD_ADMIN_KEY tersedia di Railway. AI hanya memberikan riset; sinyal tetap WAIT sampai validasi selesai.</div>`;
+ $("drawerContent").innerHTML=`<h2>${esc(t.symbol)} <span style="color:var(--green);font-size:12px">${esc(chainLabel(t.network))}</span></h2><div class="drawer-sub">${esc(t.tokenAddress)}</div><div class="drawer-grid"><div class="drawer-stat"><span>PRICE USD</span><b>${money(t.price)}</b></div><div class="drawer-stat"><span>LIQUIDITY</span><b>${compact(t.liquidity)}</b></div><div class="drawer-stat"><span>VOLUME 24H</span><b>${compact(t.volume24h)}</b></div><div class="drawer-stat"><span>PRICE CHANGE</span><b>${percent(t.change24h)}</b></div><div class="drawer-stat"><span>MARKET PHASE (rule-based)</span><b style="font-size:14px">${esc(t.phase)}</b></div><div class="drawer-stat"><span>ACTIVITY SCORE</span><b>${t.momentum}/100</b></div></div>${dexInsights(t)}<h3>Security Validation — Blueprint V2.0</h3>${rows.map(([name,status])=>`<div class="checklist-item"><span>${esc(name)}</span><b>${esc(status)}</b></div>`).join("")}<div class="drawer-warning">⚠️ <b>WAIT — NOT VERIFIED.</b> Activity Score adalah metrik pasar sederhana, bukan AI Opportunity Score, Winrate, atau probabilitas TP. Tidak ada rekomendasi BUY sebelum seluruh pemeriksaan keamanan lolos.</div><div class="drawer-actions"><a class="btn btn-outline" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer">↗ Lihat Pool</a><button class="btn btn-outline" id="inspectBtn">⬡ Periksa Security</button><button class="btn btn-outline" id="technicalBtn">▥ OHLCV MTF</button><button class="btn btn-primary" id="aiAnalyzeBtn">◇ Analisis AI</button></div><div id="inspectionEvidence" class="drawer-note">Memuat data on-chain terakhir...</div><div id="aiAnalysisResult" class="drawer-note">Analisis AI aktif setelah OPENAI_API_KEY dan DASHBOARD_ADMIN_KEY tersedia di Railway. AI hanya memberikan riset; sinyal tetap WAIT sampai validasi selesai.</div>`;
  $("tokenDrawer").classList.add("open");$("drawerOverlay").classList.add("open");$("tokenDrawer").setAttribute("aria-hidden","false");loadInspectionCache();
 }
 async function loadInspectionCache(){
