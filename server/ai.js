@@ -6,7 +6,13 @@ Use Bahasa Indonesia. Max 3 items per array. NO trading instruction; no unsuppor
 const withTimeout = async (url, options, ms=25000) => {
   const c=new AbortController();const timer=setTimeout(()=>c.abort(),ms);
   try {const r=await fetch(url,{...options,signal:c.signal}); const body=await r.text();
-    if (!r.ok) throw new Error("AI provider HTTP "+r.status+": "+body.slice(0,180));
+    if(!r.ok){
+      const detail=r.status===401?"API key ditolak; periksa OPENAI_API_KEY pada Railway":
+        r.status===429?"rate limit atau quota penyedia API tercapai":
+        r.status===402?"saldo API tidak cukup":"permintaan ditolak; lihat billing/permissions penyedia";
+      // Don't log response bodies; some provider errors contain credential fragments.
+      throw new Error("AI provider HTTP "+r.status+": "+detail);
+    }
     return JSON.parse(body);
   } finally {clearTimeout(timer);}
 };
