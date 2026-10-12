@@ -17,3 +17,17 @@
 .pipeline-footer small{color:#8194a2;font-size:10px;line-height:1.55;max-width:210px}
 .pipeline-footer .btn{padding:8px 10px;font-size:10px}
 @media (max-width:1150px){.pipeline-focus{flex-wrap:wrap}.pipeline-focus>small{max-width:none;text-align:left}.guard-panel .gate-line div:nth-child(2) small{max-width:none}}
+
+/* Public DEX Screener market windows and paid visibility disclosure */
+.dex-intelligence{margin:18px 0 22px;padding:16px;border:1px solid #304455;border-radius:12px;background:#121f2b}
+.dex-intelligence h3{margin:0 0 10px;font-size:14px;font-weight:750;color:#edf5fb}
+.dex-note{color:#9fb2c1;font-size:11px;line-height:1.65;margin:8px 0}
+.dex-table-wrap{max-width:100%;overflow-x:auto}
+.dex-table{width:100%;border-collapse:collapse;min-width:290px}
+.dex-table th{font-size:9px;text-align:left;color:#8ca4b4;padding:9px 6px;border-bottom:1px solid #344450;letter-spacing:.4px}
+.dex-table td{font-size:11px;padding:9px 6px;border-bottom:1px solid #283949;color:#d6e4ee}
+.dex-table td:first-child{color:#b4f66b}
+.dex-promoted{display:inline-block;color:#ffbf77;background:#3c2d1e;border:1px solid #725234;border-radius:6px;padding:5px 8px;font-size:9px;letter-spacing:.5px;font-weight:800}
+.dex-ordinary{display:inline-block;color:#9faeb9;font-size:10px}
+.dex-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.dex-tag{background:#2a3944;color:#b6cad9;border-radius:5px;font-size:9px;padding:4px 7px}
