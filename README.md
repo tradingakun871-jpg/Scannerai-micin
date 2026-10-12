@@ -96,3 +96,12 @@ The application binds `PORT` supplied by Railway and does not require a separate
 - GoPlus security and Honeypot findings remain partial; critical confirmed flags may cause NO BUY.
 - Security inspection results cached 12 minutes and persisted to PostgreSQL; the backend cycles across the four chains (two candidates per 5-minute scan) to bound API cost.
 - The full 2.5% holder rule, same-controller wallets, bundler/sniper launch tracing, and exact small-pool UNLOCKED proof **do not pass** without authoritative evidence. BUY remains WAIT.
+
+## DEX Screener public feed expansion
+- Official public endpoints: token profiles, boost latest, boost top, community takeovers, ads, and batch `GET /tokens/v1/{chainId}/{tokenAddresses}` for up to 30 tokens per call.
+- Scanner now reserves room for 18 GeckoTerminal tokens per chain, enriches up to 150 unique addresses using bounded batches every five minutes, and merges by highest-liquidity pool **without summing** volumes across pools.
+- Per-pool market windows: M5, H1, H6 and H24 with price change, volume, buys and sells. Social profile links are **not** verified sentiment.
+- Paid boosts, advertising and promoted listings are labeled independently of organic price/transaction momentum. Paid marketing does not grant `PASS` to any security gate, AI Opportunity Score, or BUY Signal.
+- When DEX and Gecko price sources refer to different pools, the dashboard warns and does not treat the DEX window statistics as belonging to the displayed primary pool.
+- Partial failures stay visible; third-party public rate limits are observed (60rpm marketing, 300rpm pair, 30 token addresses/request). Network APIs may fail or lack current coverage.
+- Helius/Alchemy/GoPlus/Honeypot remain required for independently provable blockchain security; Blueprint V2.0 remains locked.
