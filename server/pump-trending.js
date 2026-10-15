@@ -1,32 +1,26 @@
-import {isAddress} from "./pumpfeed.js";
-const API="https://frontend-api-v3.pump.fun/coins";
-let cache={status:"INITIALIZING",updatedAt:null,source:"Pump.fun coins 24H",tokens:[],error:null};
-let flight=null;
-export async function scanTrending(force=false){
- if(flight)return flight;
- if(!force&&cache.updatedAt&&Date.now()-Date.parse(cache.updatedAt)<300000)return cache;
- flight=(async()=>{
-  const jwt=process.env.PUMPFUN_BEARER_TOKEN;
-  if(!jwt){cache={...cache,status:"AUTH_REQUIRED",updatedAt:new Date().toISOString(),tokens:[],error:"Pump.fun listing API memerlukan PUMPFUN_BEARER_TOKEN. PumpPortal key tidak berlaku untuk listing ini."};return cache;}
-  try{
-   const url=new URL(API);
-   for(const [k,v] of Object.entries({limit:"50",offset:"0",sort:"volume_24h",order:"DESC",searchTerm:"",includeNsfw:"false",complete:"false"}))url.searchParams.set(k,v);
-   const response=await fetch(url,{headers:{Authorization:"Bearer "+jwt,Accept:"application/json"},signal:AbortSignal.timeout(12000)});
-   if(!response.ok)throw Error("Pump.fun HTTP "+response.status);
-   const raw=await response.json();const rows=Array.isArray(raw)?raw:Array.isArray(raw?.coins)?raw.coins:Array.isArray(raw?.data)?raw.data:[];
-   if(!Array.isArray(rows)||!rows.length)throw Error("Empty or unsupported Pump.fun response");
-   const tokens=rows.map(t=>({
-     mint:String(t.mint||t.token_address||""),name:String(t.name||"").slice(0,120),
-     symbol:String(t.symbol||"").slice(0,32),
-     volume24h:Number.isFinite(Number(t.volume_24h))?Number(t.volume_24h):null,
-     marketCapSol:Number.isFinite(Number(t.market_cap))?Number(t.market_cap):null,
-     creator:String(t.creator||""),
-     source:"Pump.fun listing API"
-   })).filter(t=>isAddress(t.mint));
-   cache={status:tokens.length?"LIVE":"EMPTY",updatedAt:new Date().toISOString(),source:"Pump.fun coins listing sorted by provider-reported 24H volume",tokens:tokens.slice(0,50),error:null};
-  }catch(e){cache={status:"UNAVAILABLE",updatedAt:new Date().toISOString(),source:"Pump.fun coins listing",tokens:[],error:String(e.message).slice(0,160)}}
-  return cache;
- })();
- try{return await flight}finally{flight=null}
+// Pump.fun-only 24-hour observation, never represented as an official Pump.fun ranking.
+// Uses already observed launch feed. No paid trade subscriptions, no JWT.
+import {getState} from "./pumpfeed.js";
+let cached={at:0,data:null};
+export async function scanTrending(){
+ const now=Date.now();
+ if(cached.data&&now-cached.at<15000)return cached.data;
+ const feed=getState(),cutoff=now-86400000;
+ const tokens=(feed.items||[]).filter(t=>Date.parse(t.createdAt)>=cutoff);
+ const rows=tokens.map(t=>({
+  mint:t.mint,symbol:t.symbol,name:t.name,creator:t.creator,
+  createdAt:t.createdAt,marketCapSol:t.marketCapSol??null,
+  initialBuy:t.initialBuy??null,solAmount:t.solAmount??null,
+  volume24h:null,trades24h:null,buys24h:null,sells24h:null,
+  rankBasis:"MOST_RECENT_OBSERVED_LAUNCH",observedOnly:true
+ })).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,100);
+ const result={status:feed.status==="CONNECTED"?"PARTIAL":"UNAVAILABLE",
+   source:"PumpPortal subscribeNewToken (free) + Helius separate security evidence",
+   ranking:"RECENT_LAUNCHES_ONLY",rankingByVolume:false,
+   volumeVerified:false,complete24h:false,
+   note:"The feed has no paid trade subscription; ranking by 24H volume or BUY/SELL flow cannot be verified. List shows recently observed launches only. In-memory cache may reset on redeploy.",
+   windowStart:new Date(cutoff).toISOString(),updatedAt:new Date(now).toISOString(),
+   tokens:rows,coverageCount:rows.length,
+   error:feed.status==="CONNECTED"?null:feed.lastError||"PumpPortal disconnected"};
+ cached={at:now,data:result};return result;
 }
-export function trendingStatus(){return cache}
