@@ -56,3 +56,14 @@ function renderPumpAnalysis(a){
  $("analysisEvidence").innerHTML=(a.indicators||[]).map(x=>'<div class="card" style="margin:7px 0;padding:10px"><b>'+safe(x.name)+'</b> — '+safe(x.status)+(x.value!=null?' · '+Number(x.value).toFixed(2)+'%':'')+'</div>').join("");
  $("analysisRisks").innerHTML=(a.riskFlags||[]).length?(a.riskFlags||[]).map(x=>'<p class="warn">'+safe(x)+'</p>').join(""):'<p>Belum ada risiko tambahan terverifikasi; ini bukan bukti token aman.</p>';
 }
+
+async function refreshTrending(){
+ try{
+  const response=await fetch("/api/trending24h");if(!response.ok)throw Error("HTTP "+response.status);
+  const data=await response.json();
+  $("trendingStatus").textContent=data.status;
+  $("trendingError").textContent=data.error||"Sumber: "+data.source+" · update "+fmt(data.updatedAt);
+  $("trendingRows").innerHTML=(data.tokens||[]).length?data.tokens.map((t,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+safe(t.symbol)+'</b> · '+safe(t.name)+'<br><a href="https://pump.fun/coin/'+encodeURIComponent(t.mint)+'" target="_blank" rel="noopener noreferrer">'+safe(t.mint.slice(0,12))+'… ↗</a></td><td>'+safe(t.volume24h==null?"—":t.volume24h.toLocaleString("id-ID"))+'</td><td>'+safe(t.marketCapSol==null?"—":t.marketCapSol.toLocaleString("id-ID"))+'</td><td>Periksa langsung di token launch bila tersedia</td></tr>').join(""):'<tr><td colspan="5">'+safe(data.error||"Tidak ada token trending tervalidasi")+'</td></tr>';
+ }catch(e){$("trendingStatus").textContent="UNAVAILABLE";$("trendingError").textContent=e.message}
+}
+refreshTrending();setInterval(()=>{if(!document.hidden)refreshTrending()},300000);
