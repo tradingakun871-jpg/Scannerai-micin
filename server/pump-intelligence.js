@@ -12,7 +12,7 @@ export async function inspect(mint,creator){
  if(!isAddress(mint))throw Error("Invalid mint");
  const existing=cache.get(mint);if(existing&&Date.now()-existing.ts<180000)return existing.data;
  const res={mint,checkedAt:new Date().toISOString(),source:"Helius Solana RPC",status:"PARTIAL",
-  holder:{status:"UNVERIFIED",topAccounts:[],observedLargestPct:null,reason:"Token accounts sampled, not proven beneficial owner groups"},
+  holder:{status:"UNVERIFIED",topAccounts:[],observedLargestPct:null,top10Pct:null,top20Pct:null,bubbles:[],reason:"Token accounts sampled, not proven beneficial owner groups"},
   bundler:{status:"UNVERIFIED",reason:"Same-block bundle and common controller cannot be confirmed from largest accounts alone"},
   sniper:{status:"UNVERIFIED",reason:"Early swap trades and remaining balances require full verified launch-trace"},
   developer:{status:"UNVERIFIED",creator:creator||null,reason:"Creator wallet relation and funding not fully traced"},
@@ -31,6 +31,17 @@ export async function inspect(mint,creator){
       pct:Number((Number(a.amount||0)/total*100).toFixed(4))
     }));
     res.holder.observedLargestPct=Math.max(...res.holder.topAccounts.map(a=>a.pct));
+    res.holder.top10Pct=Number(res.holder.topAccounts.slice(0,10).reduce((s,a)=>s+a.pct,0).toFixed(4));
+    res.holder.top20Pct=Number(res.holder.topAccounts.reduce((s,a)=>s+a.pct,0).toFixed(4));
+    const owners=new Map();
+    for(const a of res.holder.topAccounts){
+      const k=a.owner||a.tokenAccount;
+      const v=owners.get(k)||{id:k,owner:a.owner||null,pct:0,accounts:0,relatedToCreator:!!creator&&a.owner===creator};
+      v.pct+=a.pct;v.accounts++;owners.set(k,v);
+    }
+    res.holder.bubbles=[...owners.values()].map(v=>({...v,pct:Number(v.pct.toFixed(4))})).sort((a,b)=>b.pct-a.pct);
+    res.holder.connections=[];
+    res.holder.connectionsVerified=false;
     res.holder.reason="Top token accounts only; duplicate owners/system wallets and linked funding unverified. Holder ≤2.5% rule NOT cleared.";
   }
   if(creator&&isAddress(creator)){
