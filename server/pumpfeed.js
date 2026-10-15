@@ -1,47 +1,29 @@
 import WebSocket from "ws";
-
-// PumpPortal is an independent data provider for Pump.fun, not Pump.fun itself.
-// Never convert token creation events to eligible BUY decisions.
-const MAX_EVENTS=250;
-const recent=[];
-let socket=null,retryTimer=null,stopped=false;
-let state={status:"NOT_CONFIGURED",connectedAt:null,lastEventAt:null,lastError:null,reconnects:0,received:0};
-const validMint=x=>/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(x||""));
-export function pumpStatus(){
-  return {...state,provider:"PumpPortal",feed:"Pump.fun new tokens",events:[...recent].reverse(),autoTrade:false,securityVerified:false};
-}
-function retry(){
-  if(stopped||retryTimer)return;
-  retryTimer=setTimeout(()=>{retryTimer=null;connect();},Math.min(60000,5000*(1+state.reconnects)));
-  retryTimer.unref?.();
-}
+const LIMIT=300, events=[], byMint=new Map();
+let ws=null,retry=null,tries=0;
+const stats={status:"INITIALIZING",connectedAt:null,lastEventAt:null,lastError:null,received:0};
+const isAddress=s=>/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(s||""));
 function connect(){
-  const key=process.env.PUMPPORTAL_API_KEY;
-  if(!key){state.status="NOT_CONFIGURED";state.lastError="Set PUMPPORTAL_API_KEY in Railway Variables";return;}
-  state.status="CONNECTING";
-  try{
-    socket=new WebSocket("wss://pumpportal.fun/api/data?api-key="+encodeURIComponent(key),{handshakeTimeout:12000});
-    socket.on("open",()=>{
-      state.status="CONNECTED";state.connectedAt=new Date().toISOString();state.lastError=null;
-      socket.send(JSON.stringify({method:"subscribeNewToken"}));
-    });
-    socket.on("message",raw=>{
-      try{
-        const e=JSON.parse(String(raw));
-        const mint=e.mint||e.tokenAddress;
-        if(!validMint(mint))return;
-        if(recent.some(x=>x.mint===mint))return;
-        const token={mint,symbol:String(e.symbol||"UNKNOWN").slice(0,32),name:String(e.name||"Unknown").slice(0,120),
-          creator:String(e.traderPublicKey||e.creator||"").slice(0,60),
-          signature:String(e.signature||"").slice(0,110),
-          receivedAt:new Date().toISOString(),source:"PumpPortal / Pump.fun",
-          status:"WAIT",reason:"New launch only — liquidity, holders, bundler, sniper, social, contract, smart money and LP proof UNVERIFIED"};
-        recent.push(token);if(recent.length>MAX_EVENTS)recent.shift();
-        state.lastEventAt=token.receivedAt;state.received++;
-      }catch{/* Ignore malformed frames */}
-    });
-    socket.on("error",e=>{state.lastError=String(e.message||"websocket error").slice(0,180);});
-    socket.on("close",()=>{state.status="DISCONNECTED";state.reconnects++;retry();});
-  }catch(e){state.status="DISCONNECTED";state.lastError=String(e.message).slice(0,180);state.reconnects++;retry();}
+ const key=process.env.PUMPPORTAL_API_KEY;
+ if(!key){stats.status="NOT_CONFIGURED";stats.lastError="PUMPPORTAL_API_KEY belum diatur";return;}
+ stats.status="CONNECTING";
+ ws=new WebSocket("wss://pumpportal.fun/api/data?api-key="+encodeURIComponent(key),{handshakeTimeout:12000});
+ ws.on("open",()=>{tries=0;stats.status="CONNECTED";stats.lastError=null;stats.connectedAt=new Date().toISOString();ws.send(JSON.stringify({method:"subscribeNewToken"}));});
+ ws.on("message",raw=>{try{
+  const d=JSON.parse(String(raw)),mint=String(d.mint||"");
+  if(!isAddress(mint)||byMint.has(mint))return;
+  const item={mint,name:String(d.name||"Unknown").slice(0,100),symbol:String(d.symbol||"UNKNOWN").slice(0,25),
+    creator:isAddress(d.traderPublicKey)?d.traderPublicKey:null,signature:String(d.signature||"").slice(0,110),
+    createdAt:new Date().toISOString(),initialBuy:Number.isFinite(Number(d.initialBuy))?Number(d.initialBuy):null,
+    solAmount:Number.isFinite(Number(d.solAmount))?Number(d.solAmount):null,marketCapSol:Number.isFinite(Number(d.marketCapSol))?Number(d.marketCapSol):null,
+    source:"PumpPortal: Pump.fun launch",signal:"WAIT",risk:"UNVERIFIED"};
+  byMint.set(mint,item);events.unshift(item);if(events.length>LIMIT){const old=events.pop();byMint.delete(old.mint)}
+  stats.lastEventAt=item.createdAt;stats.received++;
+ }catch(e){console.warn("[pump-event] malformed payload");}});
+ ws.on("error",e=>{stats.lastError=String(e.message).slice(0,150)});
+ ws.on("close",()=>{stats.status="DISCONNECTED";if(retry)clearTimeout(retry);retry=setTimeout(connect,Math.min(60000,5000*++tries));retry.unref?.()});
 }
-export function startPumpFeed(){stopped=false;connect();}
+export function start(){connect()}
+export function getState(){return {...stats,count:events.length,items:events.slice(0,100),source:"PumpPortal",tradeStreamEnabled:false,autoTrade:false}}
+export function getToken(mint){return byMint.get(mint)}
+export {isAddress};
