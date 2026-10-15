@@ -356,3 +356,21 @@ $("clearAdminKey").addEventListener("click",async()=>{
 });
 checkAdminSession();
 clock();setInterval(clock,30000);loadOverview();setInterval(()=>{if(!document.hidden)loadOverview(true);},60000);
+
+
+async function loadPumpEvents(){
+ try{
+  const p=await api("/api/pumpfun");
+  const status=$("pumpFeedStatus"),rows=$("pumpEventRows"),count=$("pumpEventCount");
+  if(!status||!rows||!count)return;
+  status.textContent=p.status;
+  count.textContent=p.events.length;
+  rows.innerHTML=p.events.length?p.events.slice(0,35).map(t=>
+   '<tr><td><b>'+esc(t.symbol)+'</b><small style="display:block">'+esc(t.name)+'</small></td>'+
+   '<td>'+esc(t.creator?t.creator.slice(0,8)+'…':'—')+'</td><td>'+esc(fmtWib(t.receivedAt))+'</td>'+
+   '<td><span class="waiting">WAIT / UNVERIFIED</span></td>'+
+   '<td><a href="https://pump.fun/coin/'+encodeURIComponent(t.mint)+'" target="_blank" rel="noopener noreferrer">Pump.fun ↗</a></td></tr>').join("") :
+   '<tr><td colspan="5" class="table-empty">'+esc(p.status==="NOT_CONFIGURED"?"PUMPPORTAL_API_KEY belum diatur di Railway":p.status==="CONNECTED"?"Terhubung. Menunggu token baru.":"Feed belum terhubung; scanner lama tetap aktif.")+'</td></tr>';
+ }catch(e){const el=$("pumpFeedStatus");if(el)el.textContent="UNAVAILABLE";}
+}
+loadPumpEvents();setInterval(()=>{if(!document.hidden)loadPumpEvents();},10000);
