@@ -3,6 +3,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {start,getState,getToken,isAddress} from "./pumpfeed.js";
 import {inspect} from "./pump-intelligence.js";
+import {assessPump} from "./pump-analysis.js";
 const app=express();app.disable("x-powered-by");app.set("trust proxy",1);
 app.use(express.json({limit:"8kb"}));
 app.use((req,res,next)=>{res.set("X-Content-Type-Options","nosniff");res.set("Cache-Control","no-store");res.set("Referrer-Policy","no-referrer");next()});
@@ -22,7 +23,7 @@ app.post("/api/inspect",async(req,res)=>{
  const mint=String(req.body?.mint||"");
  if(!isAddress(mint))return res.status(400).json({error:"Mint tidak valid"});
  const found=getToken(mint);if(!found)return res.status(404).json({error:"Token tidak ditemukan dalam cache live"});
- try{res.json(await inspect(mint,found.creator))}
+ try{const evidence=await inspect(mint,found.creator);res.json({...evidence,pumpAnalysis:assessPump(evidence)})}
  catch(e){res.status(502).json({error:String(e.message||"Inspector unavailable").slice(0,140)})}
 });
 app.use(express.static(root,{index:false,maxAge:0}));
