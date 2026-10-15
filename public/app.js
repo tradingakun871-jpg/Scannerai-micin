@@ -8,7 +8,7 @@ $("rows").innerHTML=arr.length?arr.map(t=>'<tr><td><b>'+safe(t.symbol)+'</b><div
 }catch(e){$("feed").textContent="API UNAVAILABLE";}}
 $("search").addEventListener("input",refresh);
 $("rows").addEventListener("click",async e=>{const b=e.target.closest("button[data-mint]");if(!b||busy)return;busy=true;b.disabled=true;$("detail").textContent="Mengambil bukti on-chain...";
-try{const r=await fetch("/api/inspect",{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Key":$("key").value},body:JSON.stringify({mint:b.dataset.mint})}),d=await r.json();$("detail").textContent=JSON.stringify(d,null,2);if(d.holder)renderHolders(d)}
+try{const r=await fetch("/api/inspect",{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Key":$("key").value},body:JSON.stringify({mint:b.dataset.mint})}),d=await r.json();$("detail").textContent=JSON.stringify(d,null,2);if(d.holder)renderHolders(d);if(d.pumpAnalysis)renderPumpAnalysis(d.pumpAnalysis)}
 catch(e){$("detail").textContent="Gagal: "+e.message}finally{busy=false;b.disabled=false}});
 refresh();setInterval(()=>{if(!document.hidden)refresh()},5000);
 
@@ -43,4 +43,16 @@ function renderHolders(d){
    svg+='<text x="'+xx+'" y="'+(yy+4)+'" text-anchor="middle" font-size="11" fill="#fff">'+pct(x.pct)+'</text>';
  });
  document.getElementById("bubbles").innerHTML=svg+"</svg>";
+}
+
+function renderPumpAnalysis(a){
+ $("aiDecision").textContent=a.decision||"WAIT";
+ $("opportunityScore").textContent=a.score==null?"—":String(a.score)+"/100";
+ $("scoreNote").textContent="Bukti "+a.observedWeight+"/"+a.requiredWeight+" poin tersedia; score tertahan sampai lengkap";
+ $("buyDecision").textContent=a.buy?.status||"WAIT";
+ $("sellDecision").textContent=a.sell?.status||"UNVERIFIED";
+ for(const x of a.targets||[]){const id="p"+String(x.multiple).replace("X","");const e=$(id);if(e)e.textContent=x.probability==null?"—":(Number(x.probability)*100).toFixed(1)+"%";}
+ $("aiReason").textContent=(a.reasons||[]).join(" ");
+ $("analysisEvidence").innerHTML=(a.indicators||[]).map(x=>'<div class="card" style="margin:7px 0;padding:10px"><b>'+safe(x.name)+'</b> — '+safe(x.status)+(x.value!=null?' · '+Number(x.value).toFixed(2)+'%':'')+'</div>').join("");
+ $("analysisRisks").innerHTML=(a.riskFlags||[]).length?(a.riskFlags||[]).map(x=>'<p class="warn">'+safe(x)+'</p>').join(""):'<p>Belum ada risiko tambahan terverifikasi; ini bukan bukti token aman.</p>';
 }
