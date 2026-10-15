@@ -1,4 +1,5 @@
 import express from "express";
+import {startPumpFeed,pumpStatus} from "./pumpfeed.js";
 import {adminKeyMatches,makeSession,verifySession,readSessionCookie,isSameOrigin,COOKIE_NAME,COOKIE_LIFETIME_MS,cookieOptions} from "./admin-session.js";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
@@ -28,7 +29,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"../public"
 const has=(key)=>!!process.env[key];
 const aiActivity={lastSuccessAt:null,lastErrorAt:null};
 const sources=()=>({
-  market:{geckoterminal:{configured:true,implemented:true},dexscreener:{configured:true,implemented:true}},
+  market:{geckoterminal:{configured:true,implemented:true},dexscreener:{configured:true,implemented:true},pumpfun:{provider:"PumpPortal",configured:has("PUMPPORTAL_API_KEY"),implemented:true,feedStatus:pumpStatus().status}},
   solana:{helius:{configured:has("HELIUS_API_KEY"),implemented:true,limited:true,verified:false}},
   evm:{routescan:{configured:has("ROUTESCAN_API_KEY"),implemented:true,limited:true},
     alchemy:{configured:has("ALCHEMY_API_KEY"),implemented:true,limited:true,verified:false}},
@@ -109,6 +110,7 @@ function visibleToken(token){
     aiScore:score.opportunityScore,opportunity:score,
     tpProbability:null, targetX:null};
 }
+app.get("/api/pumpfun",(_req,res)=>res.json(pumpStatus()));
 app.get("/api/health",(req,res)=>{
   const s=scanStatus(),age=s.scannedAt?Date.now()-Date.parse(s.scannedAt):null;
   const scanStale=age===null||age>SCAN_INTERVAL_MS*2.5;
@@ -263,6 +265,7 @@ async function worker(){
   finally{workerRunning=false}
 }
 app.listen(PORT,"0.0.0.0",()=>{
+  startPumpFeed();
   console.log("MICIN RADAR V2.0 port",PORT,"Blueprint LOCKED","AutoTrade disabled");
   setTimeout(worker,1200);
   setInterval(worker,SCAN_INTERVAL_MS).unref();
