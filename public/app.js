@@ -67,3 +67,14 @@ async function refreshTrending(){
  }catch(e){$("trendingStatus").textContent="UNAVAILABLE";$("trendingError").textContent=e.message}
 }
 refreshTrending();setInterval(()=>{if(!document.hidden)refreshTrending()},300000);
+
+async function refreshTrades(){
+ try{
+  const response=await fetch("/api/trades24h");if(!response.ok)throw Error("HTTP "+response.status);
+  const d=await response.json();$("tradeStatus").textContent=d.status;
+  $("tradeCoverage").textContent=d.coverage+" | Data sejak "+fmt(d.observedSince)+" | "+(d.complete24h?"24H observation window elapsed":"Partial window")+
+  " | Paid events "+d.paidEvents+"/"+d.paidEventCap+" | Indicative provider charge "+Number(d.estimatedChargeSOL||0).toFixed(5)+" SOL (not invoiced amount)";
+  $("tradeRows").innerHTML=d.rows?.length?d.rows.map((t,i)=>"<tr><td>"+(i+1)+"</td><td><a href='https://pump.fun/coin/"+encodeURIComponent(t.mint)+"' target='_blank' rel='noopener noreferrer'>"+safe(t.symbol)+" ↗</a></td><td>"+t.buySOL.toFixed(3)+"</td><td>"+t.sellSOL.toFixed(3)+"</td><td>"+t.netSOL.toFixed(3)+"</td><td>"+t.volumeSOL.toFixed(3)+"</td><td>"+t.buys+" / "+t.sells+"</td></tr>").join(""):"<tr><td colspan='7'>Belum ada trade yang diterima pada token yang dipantau.</td></tr>";
+ }catch(e){$("tradeStatus").textContent="UNAVAILABLE";$("tradeCoverage").textContent=e.message}
+}
+refreshTrades();setInterval(()=>{if(!document.hidden)refreshTrades()},15000);
