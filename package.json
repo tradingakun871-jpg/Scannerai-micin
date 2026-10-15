@@ -6,7 +6,7 @@
   "description": "AI Meme Coin Early Gem Hunter V2.0 - safe by default",
   "scripts": {
     "start": "node server/index.js",
-    "check": "node --check server/index.js && node --check server/pumpfeed.js && node --check server/pump-intelligence.js && node --check public/app.js && node --check server/pump-analysis.js",
+    "check": "node --check server/index.js && node --check server/pumpfeed.js && node --check server/pump-intelligence.js && node --check public/app.js && node --check server/pump-analysis.js && node --check server/pump-trending.js",
     "prestart": "npm run check"
   },
   "engines": {
